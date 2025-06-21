@@ -3,32 +3,37 @@ import GameBoard from '../../common/GameBoard';
 import GameTimer from '../../common/GameTimer';
 import useGameWebSocket from '../../../hooks/useGameWebSocket';
 import { GAME_STATUS, GAME_MESSAGES } from '../../../utils/gameUtils';
-import ShipPlacement from './ShipPlacement';
 import './Battleship.css';
 
 const BOARD_SIZE = 10;
-const SHIPS = [
-  { name: 'Carrier', size: 5, id: 'carrier' },
-  { name: 'Battleship', size: 4, id: 'battleship' },
-  { name: 'Cruiser', size: 3, id: 'cruiser' },
-  { name: 'Submarine', size: 3, id: 'submarine' },
-  { name: 'Destroyer', size: 2, id: 'destroyer' }
-];
 
 const Battleship = ({ player1Model, player2Model, gameId }) => {
   // Game state
   const [gameStatus, setGameStatus] = useState(GAME_STATUS.WAITING);
   const [currentPlayer, setCurrentPlayer] = useState(1);
-  const [player1Board, setPlayer1Board] = useState(null);
-  const [player2Board, setPlayer2Board] = useState(null);
+  const [player1Board, setPlayer1Board] = useState(createEmptyBoard());
+  const [player2Board, setPlayer2Board] = useState(createEmptyBoard());
   const [player1Shots, setPlayer1Shots] = useState(createEmptyBoard());
   const [player2Shots, setPlayer2Shots] = useState(createEmptyBoard());
-  const [message, setMessage] = useState('Setting up game...');
+  const [message, setMessage] = useState('Starting game...');
   const [winner, setWinner] = useState(null);
-  const [setupPhase, setSetupPhase] = useState(true);
 
   // WebSocket connection
   const { gameState, isConnected, sendMessage } = useGameWebSocket('battleship', gameId);
+
+  // Start game automatically when connected
+  useEffect(() => {
+    if (isConnected && gameStatus === GAME_STATUS.WAITING) {
+      // Both AIs place ships automatically
+      sendMessage({
+        type: 'start_game',
+        player1Model,
+        player2Model,
+        autoPlaceShips: true
+      });
+      setGameStatus(GAME_STATUS.IN_PROGRESS);
+    }
+  }, [isConnected, gameStatus, player1Model, player2Model, sendMessage]);
 
   // Handle game state updates from WebSocket
   useEffect(() => {
@@ -39,10 +44,6 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
       setGameStatus(gameState.status);
       setWinner(gameState.winner);
       setMessage(gameState.message || message);
-      
-      if (gameState.setupComplete) {
-        setSetupPhase(false);
-      }
     }
   }, [gameState]);
 
@@ -51,23 +52,6 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     return Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
   }
 
-  // Handle ship placement completion
-  const handleShipsPlaced = (board, ships) => {
-    setPlayer1Board(board);
-    setPlayer2Board(createEmptyBoard()); // AI will place ships automatically
-    
-    // Send to backend to start game
-    sendMessage({
-      type: 'start_game',
-      player1Model,
-      player2Model,
-      player1Ships: ships
-    });
-    
-    setSetupPhase(false);
-    setGameStatus(GAME_STATUS.IN_PROGRESS);
-  };
-
   // Get column letters
   const getColumnLabel = (index) => String.fromCharCode(65 + index);
 
@@ -75,9 +59,6 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   const renderOwnBoard = (player) => (row, col) => {
     const board = player === 1 ? player1Board : player2Board;
     const shots = player === 1 ? player2Shots : player1Shots;
-    
-    if (!board) return null;
-    
     const cellValue = board[row][col];
     const isHit = shots[row][col] === 'hit';
     const isMiss = shots[row][col] === 'miss';
@@ -87,12 +68,13 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     } else if (isMiss) {
       return <div className="cell-miss">💨</div>;
     } else if (cellValue) {
-      return <div className="cell-ship">🚢</div>;
+      // In AI vs AI, we don't show ships
+      return null;
     }
     return null;
   };
 
-  // Render cell for opponent's board (shows only hits/misses)
+  // Render cell for target board (shows shots taken)
   const renderTargetBoard = (player) => (row, col) => {
     const shots = player === 1 ? player1Shots : player2Shots;
     const shotResult = shots[row][col];
@@ -105,23 +87,11 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     return null;
   };
 
-  // Show ship placement phase
-  if (setupPhase) {
-    return (
-      <div className="battleship-game">
-        <div className="game-header">
-          <h2>Battleship Setup</h2>
-        </div>
-        <ShipPlacement onComplete={handleShipsPlaced} />
-      </div>
-    );
-  }
-
   // Main game view - Split Screen
   return (
     <div className="battleship-game split-screen">
       <div className="game-header">
-        <GameTimer isActive={gameStatus === GAME_STATUS.IN_PROGRESS} />
+        <GameTimer isActive={gameStatus === GAME_STATUS.IN_PROGRESS && !winner} />
         <div className="game-status-message">{message}</div>
       </div>
 
@@ -135,7 +105,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
           
           <div className="boards-section">
             <div className="board-container">
-              <h4>Your Fleet</h4>
+              <h4>Defense Grid</h4>
               <div className="board-with-labels">
                 <div className="column-labels">
                   <div className="empty-cell"></div>
@@ -160,7 +130,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
             </div>
             
             <div className="board-container">
-              <h4>Target Grid</h4>
+              <h4>Attack Grid</h4>
               <div className="board-with-labels">
                 <div className="column-labels">
                   <div className="empty-cell"></div>
@@ -205,7 +175,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
           
           <div className="boards-section">
             <div className="board-container">
-              <h4>Target Grid</h4>
+              <h4>Attack Grid</h4>
               <div className="board-with-labels">
                 <div className="column-labels">
                   <div className="empty-cell"></div>
@@ -230,7 +200,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
             </div>
             
             <div className="board-container">
-              <h4>Your Fleet</h4>
+              <h4>Defense Grid</h4>
               <div className="board-with-labels">
                 <div className="column-labels">
                   <div className="empty-cell"></div>

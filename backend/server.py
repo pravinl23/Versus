@@ -41,20 +41,15 @@ class GameManager:
         
         if msg_type == "start_game":
             # Handle game start
-            player1_ships = message.get("player1Ships", None)
-            
-            # Place ships for player 1 (human placed)
-            if player1_ships and self.game_type == "battleship":
-                self.game.place_ships_for_player(1, player1_ships)
-            
-            # Place ships for player 2 (AI places randomly)
             if self.game_type == "battleship":
+                # Both AIs place ships automatically
+                self.game.place_ships_for_player(1)
                 self.game.place_ships_for_player(2)
             
             # Send initial game state
             await self.send_game_state({
                 "setupComplete": True,
-                "message": f"{message.get('player1Model')} vs {message.get('player2Model')} - Game started!"
+                "message": f"{message.get('player1Model')} vs {message.get('player2Model')} - Ships placed, battle begins!"
             })
             
             # Start the game loop

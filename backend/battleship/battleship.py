@@ -10,7 +10,6 @@ from common import BaseGame, LLMClient
 
 class BattleshipGame(BaseGame):
     def __init__(self, player1_model: str, player2_model: str):
-        super().__init__(player1_model, player2_model)
         self.board_size = 10
         self.ships = [
             {'name': 'Carrier', 'size': 5, 'id': 'carrier'},
@@ -21,6 +20,9 @@ class BattleshipGame(BaseGame):
         ]
         self.player1_remaining_ships = sum(ship['size'] for ship in self.ships)
         self.player2_remaining_ships = sum(ship['size'] for ship in self.ships)
+        
+        # Call parent constructor after setting attributes
+        super().__init__(player1_model, player2_model)
         
     def initialize_game(self) -> Dict:
         """Initialize game boards and place ships"""
