@@ -3,6 +3,7 @@ import GameBoard from '../../common/GameBoard';
 import GameTimer from '../../common/GameTimer';
 import useGameWebSocket from '../../../hooks/useGameWebSocket';
 import { GAME_STATUS, GAME_MESSAGES } from '../../../utils/gameUtils';
+import ShipPlacement from './ShipPlacement';
 import './Battleship.css';
 
 const BOARD_SIZE = 10;
@@ -18,12 +19,13 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   // Game state
   const [gameStatus, setGameStatus] = useState(GAME_STATUS.WAITING);
   const [currentPlayer, setCurrentPlayer] = useState(1);
-  const [player1Board, setPlayer1Board] = useState(createEmptyBoard());
-  const [player2Board, setPlayer2Board] = useState(createEmptyBoard());
+  const [player1Board, setPlayer1Board] = useState(null);
+  const [player2Board, setPlayer2Board] = useState(null);
   const [player1Shots, setPlayer1Shots] = useState(createEmptyBoard());
   const [player2Shots, setPlayer2Shots] = useState(createEmptyBoard());
-  const [message, setMessage] = useState(GAME_MESSAGES.WAITING_FOR_MOVE);
+  const [message, setMessage] = useState('Setting up game...');
   const [winner, setWinner] = useState(null);
+  const [setupPhase, setSetupPhase] = useState(true);
 
   // WebSocket connection
   const { gameState, isConnected, sendMessage } = useGameWebSocket('battleship', gameId);
@@ -32,12 +34,15 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   useEffect(() => {
     if (gameState) {
       setCurrentPlayer(gameState.currentPlayer);
-      setPlayer1Board(gameState.player1Board || player1Board);
-      setPlayer2Board(gameState.player2Board || player2Board);
-      setPlayer1Shots(gameState.player1Shots || player1Shots);
-      setPlayer2Shots(gameState.player2Shots || player2Shots);
+      if (gameState.player1Shots) setPlayer1Shots(gameState.player1Shots);
+      if (gameState.player2Shots) setPlayer2Shots(gameState.player2Shots);
       setGameStatus(gameState.status);
       setWinner(gameState.winner);
+      setMessage(gameState.message || message);
+      
+      if (gameState.setupComplete) {
+        setSetupPhase(false);
+      }
     }
   }, [gameState]);
 
@@ -46,10 +51,33 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     return Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
   }
 
+  // Handle ship placement completion
+  const handleShipsPlaced = (board, ships) => {
+    setPlayer1Board(board);
+    setPlayer2Board(createEmptyBoard()); // AI will place ships automatically
+    
+    // Send to backend to start game
+    sendMessage({
+      type: 'start_game',
+      player1Model,
+      player2Model,
+      player1Ships: ships
+    });
+    
+    setSetupPhase(false);
+    setGameStatus(GAME_STATUS.IN_PROGRESS);
+  };
+
+  // Get column letters
+  const getColumnLabel = (index) => String.fromCharCode(65 + index);
+
   // Render cell for player's own board (shows ships and hits)
   const renderOwnBoard = (player) => (row, col) => {
     const board = player === 1 ? player1Board : player2Board;
-    const shots = player === 1 ? player2Shots : player1Shots; // Opponent's shots at this player
+    const shots = player === 1 ? player2Shots : player1Shots;
+    
+    if (!board) return null;
+    
     const cellValue = board[row][col];
     const isHit = shots[row][col] === 'hit';
     const isMiss = shots[row][col] === 'miss';
@@ -65,7 +93,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   };
 
   // Render cell for opponent's board (shows only hits/misses)
-  const renderOpponentBoard = (player) => (row, col) => {
+  const renderTargetBoard = (player) => (row, col) => {
     const shots = player === 1 ? player1Shots : player2Shots;
     const shotResult = shots[row][col];
 
@@ -77,91 +105,153 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     return null;
   };
 
-  // Handle shot on opponent's board
-  const handleShot = (row, col) => {
-    if (gameStatus !== GAME_STATUS.IN_PROGRESS) return;
-    
-    // For now, just send the move to backend
-    sendMessage({
-      type: 'move',
-      player: currentPlayer,
-      position: { row, col }
-    });
-  };
+  // Show ship placement phase
+  if (setupPhase) {
+    return (
+      <div className="battleship-game">
+        <div className="game-header">
+          <h2>Battleship Setup</h2>
+        </div>
+        <ShipPlacement onComplete={handleShipsPlaced} />
+      </div>
+    );
+  }
 
-  // Get column letters
-  const getColumnLabel = (index) => String.fromCharCode(65 + index); // A, B, C...
-
+  // Main game view - Split Screen
   return (
-    <div className="battleship-game">
+    <div className="battleship-game split-screen">
       <div className="game-header">
-        <h2>Battleship</h2>
         <GameTimer isActive={gameStatus === GAME_STATUS.IN_PROGRESS} />
+        <div className="game-status-message">{message}</div>
       </div>
 
-      <div className="players-info">
-        <div className={`player-info ${currentPlayer === 1 ? 'current-player' : ''}`}>
-          <span className="player-name">Player 1: {player1Model}</span>
-        </div>
-        <div className={`player-info ${currentPlayer === 2 ? 'current-player' : ''}`}>
-          <span className="player-name">Player 2: {player2Model}</span>
-        </div>
-      </div>
-
-      <div className="game-message">
-        {winner ? `${winner === 1 ? player1Model : player2Model} wins!` : message}
-      </div>
-
-      <div className="boards-container">
-        {/* Player 1's view */}
-        <div className="player-view">
-          <h3>{player1Model}'s Fleet</h3>
-          <div className="board-with-labels">
-            <div className="column-labels">
-              <div className="empty-cell"></div>
-              {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                <div key={i} className="label">{getColumnLabel(i)}</div>
-              ))}
-            </div>
-            <div className="board-row-container">
-              <div className="row-labels">
-                {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                  <div key={i} className="label">{i + 1}</div>
-                ))}
+      <div className="split-container">
+        {/* Player 1 Side */}
+        <div className={`player-side player-1-side ${currentPlayer === 1 ? 'active' : ''}`}>
+          <div className="player-header">
+            <h3>{player1Model}</h3>
+            <span className="player-label">Player 1</span>
+          </div>
+          
+          <div className="boards-section">
+            <div className="board-container">
+              <h4>Your Fleet</h4>
+              <div className="board-with-labels">
+                <div className="column-labels">
+                  <div className="empty-cell"></div>
+                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                    <div key={i} className="label">{getColumnLabel(i)}</div>
+                  ))}
+                </div>
+                <div className="board-row-container">
+                  <div className="row-labels">
+                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                      <div key={i} className="label">{i + 1}</div>
+                    ))}
+                  </div>
+                  <GameBoard
+                    rows={BOARD_SIZE}
+                    cols={BOARD_SIZE}
+                    renderCell={renderOwnBoard(1)}
+                    className="own-board small"
+                  />
+                </div>
               </div>
-              <GameBoard
-                rows={BOARD_SIZE}
-                cols={BOARD_SIZE}
-                renderCell={renderOwnBoard(1)}
-                className="own-board"
-              />
+            </div>
+            
+            <div className="board-container">
+              <h4>Target Grid</h4>
+              <div className="board-with-labels">
+                <div className="column-labels">
+                  <div className="empty-cell"></div>
+                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                    <div key={i} className="label">{getColumnLabel(i)}</div>
+                  ))}
+                </div>
+                <div className="board-row-container">
+                  <div className="row-labels">
+                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                      <div key={i} className="label">{i + 1}</div>
+                    ))}
+                  </div>
+                  <GameBoard
+                    rows={BOARD_SIZE}
+                    cols={BOARD_SIZE}
+                    renderCell={renderTargetBoard(1)}
+                    className="target-board small"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Targeting board */}
-        <div className="player-view">
-          <h3>Target Grid</h3>
-          <div className="board-with-labels">
-            <div className="column-labels">
-              <div className="empty-cell"></div>
-              {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                <div key={i} className="label">{getColumnLabel(i)}</div>
-              ))}
+        {/* Center divider */}
+        <div className="center-divider">
+          <div className="vs-indicator">VS</div>
+          {winner && (
+            <div className="winner-announcement">
+              {winner === 1 ? player1Model : player2Model} Wins!
             </div>
-            <div className="board-row-container">
-              <div className="row-labels">
-                {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                  <div key={i} className="label">{i + 1}</div>
-                ))}
+          )}
+        </div>
+
+        {/* Player 2 Side */}
+        <div className={`player-side player-2-side ${currentPlayer === 2 ? 'active' : ''}`}>
+          <div className="player-header">
+            <h3>{player2Model}</h3>
+            <span className="player-label">Player 2</span>
+          </div>
+          
+          <div className="boards-section">
+            <div className="board-container">
+              <h4>Target Grid</h4>
+              <div className="board-with-labels">
+                <div className="column-labels">
+                  <div className="empty-cell"></div>
+                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                    <div key={i} className="label">{getColumnLabel(i)}</div>
+                  ))}
+                </div>
+                <div className="board-row-container">
+                  <div className="row-labels">
+                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                      <div key={i} className="label">{i + 1}</div>
+                    ))}
+                  </div>
+                  <GameBoard
+                    rows={BOARD_SIZE}
+                    cols={BOARD_SIZE}
+                    renderCell={renderTargetBoard(2)}
+                    className="target-board small"
+                  />
+                </div>
               </div>
-              <GameBoard
-                rows={BOARD_SIZE}
-                cols={BOARD_SIZE}
-                renderCell={renderOpponentBoard(currentPlayer)}
-                onCellClick={handleShot}
-                className="target-board"
-              />
+            </div>
+            
+            <div className="board-container">
+              <h4>Your Fleet</h4>
+              <div className="board-with-labels">
+                <div className="column-labels">
+                  <div className="empty-cell"></div>
+                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                    <div key={i} className="label">{getColumnLabel(i)}</div>
+                  ))}
+                </div>
+                <div className="board-row-container">
+                  <div className="row-labels">
+                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                      <div key={i} className="label">{i + 1}</div>
+                    ))}
+                  </div>
+                  <GameBoard
+                    rows={BOARD_SIZE}
+                    cols={BOARD_SIZE}
+                    renderCell={renderOwnBoard(2)}
+                    className="own-board small"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

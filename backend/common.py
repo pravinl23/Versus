@@ -6,6 +6,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -19,27 +20,84 @@ class LLMClient:
     
     def _initialize_client(self):
         if self.model_type == "OPENAI":
-            import openai
-            openai.api_key = os.getenv("OPENAI_API_KEY")
-            return openai
+            from openai import AsyncOpenAI
+            return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.model_type == "ANTHROPIC":
-            from anthropic import Anthropic
-            return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            from anthropic import AsyncAnthropic
+            return AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         elif self.model_type == "GEMINI":
             import google.generativeai as genai
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
             return genai
         elif self.model_type == "GROQ":
-            from groq import Groq
-            return Groq(api_key=os.getenv("GROQ_API_KEY"))
+            from groq import AsyncGroq
+            return AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
     
     async def get_move(self, prompt: str) -> str:
         """Get a move from the LLM"""
-        # Implementation varies by model
-        # This is a placeholder - implement based on model type
-        pass
+        try:
+            if self.model_type == "OPENAI":
+                response = await self.client.chat.completions.create(
+                    model="gpt-4o-mini",  # Using a faster model for games
+                    messages=[
+                        {"role": "system", "content": "You are an expert game player. Respond only with the requested move format."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=50
+                )
+                return response.choices[0].message.content.strip()
+                
+            elif self.model_type == "ANTHROPIC":
+                response = await self.client.messages.create(
+                    model="claude-3-haiku-20240307",  # Using a faster model for games
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=50,
+                    temperature=0.7
+                )
+                return response.content[0].text.strip()
+                
+            elif self.model_type == "GROQ":
+                response = await self.client.chat.completions.create(
+                    model="llama3-8b-8192",
+                    messages=[
+                        {"role": "system", "content": "You are an expert game player. Respond only with the requested move format."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=50
+                )
+                return response.choices[0].message.content.strip()
+                
+            elif self.model_type == "GEMINI":
+                # Gemini is not async by default, so we run it in executor
+                model = self.client.GenerativeModel('gemini-pro')
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: model.generate_content(prompt)
+                )
+                return response.text.strip()
+                
+            else:
+                # Fallback for testing - make random valid moves
+                import random
+                import string
+                col = random.choice(string.ascii_uppercase[:10])
+                row = random.randint(1, 10)
+                return f"{col}{row}"
+                
+        except Exception as e:
+            print(f"Error getting move from {self.model_type}: {e}")
+            # Return a fallback move
+            import random
+            import string
+            col = random.choice(string.ascii_uppercase[:10])
+            row = random.randint(1, 10)
+            return f"{col}{row}"
 
 
 class BaseGame(ABC):
@@ -90,32 +148,38 @@ class BaseGame(ABC):
         # Generate prompt
         prompt = self.get_prompt_for_player(self.current_player)
         
-        # Get move from LLM
-        move = await current_llm.get_move(prompt)
+        # Try to get a valid move (with retries)
+        max_retries = 3
+        for attempt in range(max_retries):
+            # Get move from LLM
+            move = await current_llm.get_move(prompt)
+            
+            # Clean up the move (remove extra text if any)
+            move = move.split()[0] if move else ""
+            
+            # Validate and make move
+            if self.is_valid_move(move):
+                self.make_move(move)
+                
+                # Check for winner
+                self.winner = self.check_winner()
+                if self.winner:
+                    self.game_over = True
+                else:
+                    self.switch_player()
+                
+                return {
+                    "success": True,
+                    "move": move,
+                    "player": self.current_player,
+                    "game_state": self.game_state,
+                    "game_over": self.game_over,
+                    "winner": self.winner
+                }
         
-        # Validate and make move
-        if self.is_valid_move(move):
-            self.make_move(move)
-            
-            # Check for winner
-            self.winner = self.check_winner()
-            if self.winner:
-                self.game_over = True
-            else:
-                self.switch_player()
-            
-            return {
-                "success": True,
-                "move": move,
-                "player": self.current_player,
-                "game_state": self.game_state,
-                "game_over": self.game_over,
-                "winner": self.winner
-            }
-        else:
-            return {
-                "success": False,
-                "error": "Invalid move",
-                "move": move,
-                "player": self.current_player
-            } 
+        # If we couldn't get a valid move after retries
+        return {
+            "success": False,
+            "error": "Could not get valid move after retries",
+            "player": self.current_player
+        } 

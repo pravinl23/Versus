@@ -2,17 +2,178 @@
 @import '../../../styles/gameCommon.css';
 
 .battleship-game {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+/* Split screen layout */
+.battleship-game.split-screen {
+  padding: 0;
+}
+
+.game-header {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-status-message {
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+  color: #00a8ff;
+}
+
+/* Split container */
+.split-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Player sides */
+.player-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  transition: all 0.3s ease;
+  opacity: 0.7;
+}
+
+.player-side.active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.player-1-side {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-2-side {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Player header */
+.player-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.player-header h3 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(45deg, #00a8ff, #0066cc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.player-label {
+  color: #666;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Boards section */
+.boards-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  align-items: center;
+}
+
+.board-container {
+  text-align: center;
+}
+
+.board-container h4 {
+  margin-bottom: 1rem;
+  color: #888;
+  font-size: 1.1rem;
+}
+
+/* Small boards for split screen */
+.game-board.small .board-cell {
+  width: 30px;
+  height: 30px;
+}
+
+.board-with-labels .label {
+  width: 30px;
+  height: 30px;
+  font-size: 0.8rem;
+}
+
+.board-with-labels .empty-cell {
+  width: 30px;
+  height: 30px;
+}
+
+/* Center divider */
+.center-divider {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  text-align: center;
+}
+
+.vs-indicator {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  margin-bottom: 1rem;
+}
+
+.winner-announcement {
+  font-size: 2rem;
+  color: #FFD700;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+}
+
+/* Board styles remain the same but smaller */
+.own-board.small .board-cell {
+  background: rgba(0, 100, 200, 0.1);
+  border-color: rgba(0, 168, 255, 0.3);
+}
+
+.target-board.small .board-cell {
+  background: rgba(200, 0, 0, 0.1);
+  border-color: rgba(255, 100, 100, 0.3);
+}
+
+.target-board.small .board-cell:hover:not(.cell-hit):not(.cell-miss) {
+  background: rgba(255, 0, 0, 0.2);
+  cursor: crosshair;
+}
+
+/* Cell states for smaller boards */
+.small .cell-ship,
+.small .cell-hit {
+  font-size: 1.2rem;
+}
+
+.small .cell-miss {
+  font-size: 1rem;
+}
+
+/* Original styles for setup phase */
+.battleship-game:not(.split-screen) {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
 }
 
-.game-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.game-header h2 {
+.battleship-game:not(.split-screen) .game-header h2 {
   font-size: 2.5rem;
   margin-bottom: 1rem;
   background: linear-gradient(45deg, #00a8ff, #0066cc);
@@ -21,151 +182,7 @@
   background-clip: text;
 }
 
-.boards-container {
-  display: flex;
-  justify-content: center;
-  gap: 3rem;
-  flex-wrap: wrap;
-}
-
-.player-view {
-  text-align: center;
-}
-
-.player-view h3 {
-  margin-bottom: 1rem;
-  font-size: 1.3rem;
-  color: #00a8ff;
-}
-
-/* Board with labels */
-.board-with-labels {
-  display: inline-block;
-}
-
-.column-labels {
-  display: flex;
-  margin-bottom: 0.25rem;
-}
-
-.row-labels {
-  display: inline-block;
-  vertical-align: top;
-  margin-right: 0.25rem;
-}
-
-.board-row-container {
-  display: flex;
-}
-
-.label {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: #888;
-  font-size: 0.9rem;
-}
-
-.empty-cell {
-  width: 40px;
-  height: 40px;
-}
-
-/* Battleship specific board styles */
-.own-board .board-cell {
-  background: rgba(0, 100, 200, 0.1);
-  border-color: rgba(0, 168, 255, 0.3);
-}
-
-.target-board .board-cell {
-  background: rgba(200, 0, 0, 0.1);
-  border-color: rgba(255, 100, 100, 0.3);
-}
-
-.target-board .board-cell:hover:not(.cell-hit):not(.cell-miss) {
-  background: rgba(255, 0, 0, 0.2);
-  cursor: crosshair;
-}
-
-/* Cell states */
-.cell-ship {
-  font-size: 1.5rem;
-}
-
-.cell-hit {
-  font-size: 1.5rem;
-  animation: explode 0.5s ease-out;
-}
-
-.cell-miss {
-  font-size: 1.2rem;
-  opacity: 0.6;
-}
-
-@keyframes explode {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.5);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Players info override */
-.players-info {
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin: 1.5rem 0;
-}
-
-.player-info {
-  padding: 0.75rem 1.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.player-info.current-player {
-  border-color: #00a8ff;
-  background: rgba(0, 168, 255, 0.1);
-  box-shadow: 0 0 20px rgba(0, 168, 255, 0.5);
-}
-
-/* Game message */
-.game-message {
-  text-align: center;
-  font-size: 1.3rem;
-  padding: 1rem;
-  margin: 1rem auto;
-  max-width: 600px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Connection status */
-.connection-status {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(255, 200, 0, 0.2);
-  border: 1px solid rgba(255, 200, 0, 0.5);
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  animation: pulse 2s infinite;
-}
-
-/* Ship Placement Styles */
+/* Ship Placement Styles remain the same */
 .ship-placement {
   text-align: center;
   max-width: 600px;
@@ -211,6 +228,8 @@
 .placement-grid .board-cell {
   background: rgba(0, 50, 100, 0.2);
   border-color: rgba(0, 100, 200, 0.4);
+  width: 40px;
+  height: 40px;
 }
 
 .placed-ship {
@@ -252,35 +271,71 @@
   font-weight: bold;
 }
 
+/* Connection status */
+.connection-status {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(255, 200, 0, 0.2);
+  border: 1px solid rgba(255, 200, 0, 0.5);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  animation: pulse 2s infinite;
+}
+
+/* Animations */
+@keyframes explode {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.cell-hit {
+  animation: explode 0.5s ease-out;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
-  .boards-container {
+  .split-container {
     flex-direction: column;
-    gap: 2rem;
   }
   
-  .board-cell {
-    width: 30px;
-    height: 30px;
+  .player-1-side,
+  .player-2-side {
+    border: none;
   }
   
-  .label {
-    width: 30px;
-    height: 30px;
-    font-size: 0.8rem;
+  .player-side {
+    padding: 1rem;
   }
   
-  .empty-cell {
-    width: 30px;
-    height: 30px;
+  .boards-section {
+    flex-direction: row;
+    justify-content: center;
+    gap: 1rem;
   }
   
-  .cell-ship,
-  .cell-hit {
-    font-size: 1.2rem;
+  .game-board.small .board-cell {
+    width: 20px;
+    height: 20px;
   }
   
-  .cell-miss {
-    font-size: 1rem;
+  .board-with-labels .label {
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+  
+  .board-with-labels .empty-cell {
+    width: 20px;
+    height: 20px;
   }
 } 
