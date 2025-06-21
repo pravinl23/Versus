@@ -3,14 +3,11 @@ import './App.css'
 
 const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
 const GAMES = [
-  { name: 'Soccer', emoji: '⚽', description: '2D soccer match' },
-  { name: 'Pong', emoji: '🏓', description: 'Classic arcade game' },
-  { name: 'Battleship', emoji: '🚢', description: 'Naval strategy' },
-  { name: 'UNO', emoji: '🃏', description: 'Card game chaos' },
   { name: 'Wordle', emoji: '📝', description: 'Word guessing' },
-  { name: 'Blackjack', emoji: '🎰', description: 'Beat the dealer' },
-  { name: 'Chess', emoji: '♟️', description: 'Strategic warfare' },
-  { name: 'Poker', emoji: '💰', description: 'Bluff and bet' }
+  { name: 'Trivia', emoji: '🧠', description: 'Test your knowledge' },
+  { name: 'NYT Connections', emoji: '🔗', description: 'Find the connections' },
+  { name: 'Battleship', emoji: '🚢', description: 'Naval strategy' },
+  { name: 'Connect 4', emoji: '🔴', description: 'Four in a row' }
 ]
 
 function App() {
