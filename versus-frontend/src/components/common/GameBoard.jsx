@@ -6,6 +6,8 @@ const GameBoard = ({
   cols, 
   renderCell, 
   onCellClick,
+  onCellHover,
+  onCellLeave,
   className = '' 
 }) => {
   return (
@@ -17,6 +19,8 @@ const GameBoard = ({
               key={`${row}-${col}`}
               className="board-cell"
               onClick={() => onCellClick && onCellClick(row, col)}
+              onMouseEnter={() => onCellHover && onCellHover(row, col)}
+              onMouseLeave={() => onCellLeave && onCellLeave(row, col)}
             >
               {renderCell(row, col)}
             </div>
