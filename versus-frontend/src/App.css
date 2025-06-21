@@ -219,6 +219,23 @@ body {
   transform: none;
 }
 
+/* Game not implemented */
+.game-not-implemented {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.game-not-implemented h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #888;
+}
+
+.game-not-implemented p {
+  font-size: 1.2rem;
+  color: #666;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .title {
