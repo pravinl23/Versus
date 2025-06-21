@@ -5,9 +5,9 @@ Trivia Game Implementation for VERSUS platform
 import asyncio
 import time
 import random
+import os
 from typing import Dict, Any, List, Optional
 import sys
-import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from common import BaseGame, LLMClient
