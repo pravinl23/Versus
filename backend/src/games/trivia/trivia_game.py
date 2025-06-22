@@ -6,7 +6,7 @@ import asyncio
 import time
 import random
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,6 +28,14 @@ class TriviaGame(BaseGame):
         self.player2_times = []
         self.player1_responses = []  # Store player 1 responses
         self.player2_responses = []  # Store player 2 responses
+        
+        # Track wrong answers for penalty system
+        self.player1_wrong_answers: Dict[int, Set[str]] = {}  # question_index -> set of wrong choices
+        self.player2_wrong_answers: Dict[int, Set[str]] = {}
+        
+        # Track cooldown periods
+        self.player1_cooldown_until = 0  # timestamp when cooldown ends
+        self.player2_cooldown_until = 0
         
         # Race state
         self.race_finished = False
@@ -67,12 +75,37 @@ class TriviaGame(BaseGame):
     
     async def ask_question_to_player(self, player: int) -> Dict[str, Any]:
         """Ask current question to a specific player"""
+        current_time = time.time()
+        
+        # Check if player is still in cooldown
+        if player == 1 and current_time < self.player1_cooldown_until:
+            remaining_cooldown = self.player1_cooldown_until - current_time
+            return {
+                "error": f"Player 1 is in cooldown for {remaining_cooldown:.1f} more seconds",
+                "cooldown_remaining": remaining_cooldown,
+                "player": player
+            }
+        elif player == 2 and current_time < self.player2_cooldown_until:
+            remaining_cooldown = self.player2_cooldown_until - current_time
+            return {
+                "error": f"Player 2 is in cooldown for {remaining_cooldown:.1f} more seconds", 
+                "cooldown_remaining": remaining_cooldown,
+                "player": player
+            }
+        
         current_question = self.get_player_current_question(player)
         if not current_question:
             return {"error": f"No more questions for player {player}"}
         
-        # Format the prompt for the model
-        prompt = self._format_question_prompt(current_question)
+        # Get the current question index for tracking wrong answers
+        question_index = self.player1_question_index if player == 1 else self.player2_question_index
+        
+        # Get wrong answers for this question
+        wrong_answers = (self.player1_wrong_answers.get(question_index, set()) if player == 1 
+                        else self.player2_wrong_answers.get(question_index, set()))
+        
+        # Format the prompt for the model (excluding wrong choices)
+        prompt = self._format_question_prompt(current_question, wrong_answers)
         
         # Get the appropriate model
         model = self.player1 if player == 1 else self.player2
@@ -88,43 +121,68 @@ class TriviaGame(BaseGame):
         # Store response data
         response_data = {
             "player": player,
-            "question_number": (self.player1_question_index if player == 1 else self.player2_question_index) + 1,
+            "question_number": question_index + 1,
             "question": current_question,
             "response": response,
             "correct": is_correct,
             "time": response_time,
-            "correct_answer": current_question["correct_answer"]
+            "correct_answer": current_question["correct_answer"],
+            "wrong_answers_so_far": list(wrong_answers),
+            "attempt_number": len(wrong_answers) + 1
         }
         
         # Update player state
-        if player == 1:
-            self.player1_responses.append(response_data)
-            self.player1_times.append(response_time)
-            if is_correct:
+        if is_correct:
+            # Correct answer - advance to next question and clear wrong answers
+            if player == 1:
+                self.player1_responses.append(response_data)
+                self.player1_times.append(response_time)
                 self.player1_score += 1
                 self.player1_question_index += 1
-            # If wrong, they still advance (can be changed if you want them to retry)
+                # Clear wrong answers for this question
+                if question_index in self.player1_wrong_answers:
+                    del self.player1_wrong_answers[question_index]
             else:
-                self.player1_question_index += 1
-        else:
-            self.player2_responses.append(response_data)
-            self.player2_times.append(response_time)
-            if is_correct:
+                self.player2_responses.append(response_data)
+                self.player2_times.append(response_time)
                 self.player2_score += 1
                 self.player2_question_index += 1
-            # If wrong, they still advance (can be changed if you want them to retry)
+                # Clear wrong answers for this question
+                if question_index in self.player2_wrong_answers:
+                    del self.player2_wrong_answers[question_index]
+        else:
+            # Wrong answer - apply penalty
+            if player == 1:
+                self.player1_responses.append(response_data)
+                # Add wrong answer to tracking
+                if question_index not in self.player1_wrong_answers:
+                    self.player1_wrong_answers[question_index] = set()
+                self.player1_wrong_answers[question_index].add(self._normalize_choice(response))
+                # Apply 1 second cooldown
+                self.player1_cooldown_until = time.time() + 1.0
+                response_data["cooldown_applied"] = True
+                response_data["cooldown_until"] = self.player1_cooldown_until
             else:
-                self.player2_question_index += 1
+                self.player2_responses.append(response_data)
+                # Add wrong answer to tracking
+                if question_index not in self.player2_wrong_answers:
+                    self.player2_wrong_answers[question_index] = set()
+                self.player2_wrong_answers[question_index].add(self._normalize_choice(response))
+                # Apply 1 second cooldown
+                self.player2_cooldown_until = time.time() + 1.0
+                response_data["cooldown_applied"] = True
+                response_data["cooldown_until"] = self.player2_cooldown_until
         
-        # Check if this player finished the race
-        player_finished = (self.player1_question_index >= len(self.questions) if player == 1 
-                          else self.player2_question_index >= len(self.questions))
-        
-        if player_finished and not self.race_finished:
-            self.race_finished = True
-            self.race_winner = player
-            self.game_over = True
-            self.winner = player
+        # Check if this player finished the race (only if they got the answer right)
+        if is_correct:
+            player_finished = (self.player1_question_index >= len(self.questions) if player == 1 
+                              else self.player2_question_index >= len(self.questions))
+            
+            if player_finished and not self.race_finished:
+                self.race_finished = True
+                self.race_winner = player
+                self.game_over = True
+                self.winner = player
         
         # Update game state
         self._update_game_state()
@@ -215,19 +273,55 @@ class TriviaGame(BaseGame):
         except Exception as e:
             return f"API Error: {str(e)}"
     
-    def _format_question_prompt(self, question: Dict[str, Any]) -> str:
-        """Format question for the LLM"""
+    def _format_question_prompt(self, question: Dict[str, Any], wrong_answers: Set[str] = None) -> str:
+        """Format question for the LLM, excluding wrong answers"""
+        if wrong_answers is None:
+            wrong_answers = set()
+            
         prompt = f"Question: {question['question']}\n"
         
         if "choices" in question and question["choices"]:
             prompt += "Options:\n"
+            available_choices = []
+            choice_letters = []
+            
             for i, choice in enumerate(question["choices"]):
-                prompt += f"{chr(65 + i)}. {choice}\n"
-            prompt += "\nAnswer with just the letter (A, B, C, or D) or the answer text:"
+                choice_letter = chr(65 + i)  # A, B, C, D
+                # Check if this choice should be excluded
+                if (choice not in wrong_answers and 
+                    choice_letter not in wrong_answers and 
+                    choice.lower() not in wrong_answers):
+                    available_choices.append(choice)
+                    choice_letters.append(choice_letter)
+                    prompt += f"{choice_letter}. {choice}\n"
+            
+            if len(available_choices) > 1:
+                prompt += f"\nAnswer with just the letter ({', '.join(choice_letters)}) or the answer text:"
+            else:
+                prompt += "\nOnly one option remaining. Answer with the letter or text:"
         else:
             prompt += "\nProvide a short, direct answer:"
         
+        # Add penalty reminder if there were previous wrong attempts
+        if wrong_answers:
+            prompt += f"\n(Note: You previously answered incorrectly with: {', '.join(wrong_answers)})"
+        
         return prompt
+    
+    def _normalize_choice(self, response: str) -> str:
+        """Normalize a response to track as a wrong answer"""
+        response = response.lower().strip()
+        
+        # If it's just a letter (A, B, C, D), return as is
+        if len(response) == 1 and response.isalpha():
+            return response.upper()
+        
+        # If it starts with a letter followed by period/space, extract the letter
+        if len(response) >= 2 and response[0].isalpha() and response[1] in '. ':
+            return response[0].upper()
+        
+        # Otherwise return the cleaned response text
+        return response.strip()
     
     def _evaluate_answer(self, response: str, correct_answer: str) -> bool:
         """Evaluate if the response is correct"""
@@ -263,6 +357,8 @@ class TriviaGame(BaseGame):
     
     def _update_game_state(self):
         """Update the current game state"""
+        current_time = time.time()
+        
         self.game_state.update({
             "player1_question_index": self.player1_question_index,
             "player2_question_index": self.player2_question_index,
@@ -273,12 +369,24 @@ class TriviaGame(BaseGame):
             "race_finished": self.race_finished,
             "race_winner": self.race_winner,
             "player1_responses": self.player1_responses,
-            "player2_responses": self.player2_responses
+            "player2_responses": self.player2_responses,
+            # Cooldown information
+            "player1_in_cooldown": current_time < self.player1_cooldown_until,
+            "player2_in_cooldown": current_time < self.player2_cooldown_until,
+            "player1_cooldown_remaining": max(0, self.player1_cooldown_until - current_time),
+            "player2_cooldown_remaining": max(0, self.player2_cooldown_until - current_time),
+            # Wrong answer tracking
+            "player1_wrong_answers": {str(k): list(v) for k, v in self.player1_wrong_answers.items()},
+            "player2_wrong_answers": {str(k): list(v) for k, v in self.player2_wrong_answers.items()}
         })
 
     def get_final_results(self) -> Dict[str, Any]:
         """Get comprehensive final race results"""
         race_time = time.time() - self.race_start_time if self.race_start_time else 0
+        
+        # Calculate penalty statistics
+        total_wrong_attempts_p1 = sum(len(wrong_set) for wrong_set in self.player1_wrong_answers.values())
+        total_wrong_attempts_p2 = sum(len(wrong_set) for wrong_set in self.player2_wrong_answers.values())
         
         return {
             "game_over": True,
@@ -296,6 +404,14 @@ class TriviaGame(BaseGame):
             "average_times": {
                 "player1": sum(self.player1_times) / len(self.player1_times) if self.player1_times else 0,
                 "player2": sum(self.player2_times) / len(self.player2_times) if self.player2_times else 0
+            },
+            "penalty_stats": {
+                "player1_total_wrong_attempts": total_wrong_attempts_p1,
+                "player2_total_wrong_attempts": total_wrong_attempts_p2,
+                "player1_total_cooldown_time": total_wrong_attempts_p1 * 1.0,  # 1 second per wrong attempt
+                "player2_total_cooldown_time": total_wrong_attempts_p2 * 1.0,
+                "player1_questions_with_errors": len(self.player1_wrong_answers),
+                "player2_questions_with_errors": len(self.player2_wrong_answers)
             },
             "total_questions": len(self.questions),
             "player1_responses": self.player1_responses,
