@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYT Connections AI Battle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .controls {
+            text-align: center;
+            padding: 20px;
+        }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .player-side {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+        .player-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .chatgpt-header {
+            background: linear-gradient(45deg, #10a37f, #1a7f64);
+        }
+        .claude-header {
+            background: linear-gradient(45deg, #d97706, #b45309);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .word {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.5s ease;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .word.selected {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+            transform: scale(1.05);
+        }
+        .word.correct {
+            background: #28a745;
+            color: white;
+            border-color: #1e7e34;
+        }
+        .word.incorrect {
+            background: #dc3545;
+            color: white;
+            border-color: #c82333;
+        }
+        .word.used {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .word.moving {
+            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 10;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+            transform: scale(1.05);
+        }
+        .word.completed-group {
+            background: #28a745;
+            color: white;
+            border-color: #1e7e34;
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+        .status {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .status.thinking {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #495057;
+        }
+        .game-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .winner-announcement {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            z-index: 1000;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 NYT Connections AI Battle</h1>
+        <p>Watch ChatGPT vs Claude compete to solve the puzzle!</p>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="newGameBtn">Start New Game</button>
+        <button class="btn" id="startBattleBtn" disabled>Start Battle</button>
+    </div>
+
+    <div class="game-info" id="gameInfo" style="display: none;">
+        <h3>Puzzle #<span id="puzzleId"></span> - <span id="puzzleDate"></span></h3>
+        <p>First AI to find all 4 groups wins!</p>
+    </div>
+
+    <div class="game-container">
+        <div class="player-side">
+            <div class="player-header chatgpt-header">
+                🤖 ChatGPT (GPT-4)
+            </div>
+            <div class="grid" id="chatgptGrid"></div>
+            <div class="status" id="chatgptStatus">Ready to play</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-label">Turns</div>
+                    <div class="stat-value" id="chatgptTurns">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Groups Found</div>
+                    <div class="stat-value" id="chatgptGroups">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="chatgptScore">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="player-side">
+            <div class="player-header claude-header">
+                🧠 Claude (Sonnet)
+            </div>
+            <div class="grid" id="claudeGrid"></div>
+            <div class="status" id="claudeStatus">Ready to play</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-label">Turns</div>
+                    <div class="stat-value" id="claudeTurns">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Groups Found</div>
+                    <div class="stat-value" id="claudeGroups">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="claudeScore">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentGame = null;
+        let gameInProgress = false;
+        let chatgptStats = { turns: 0, groups: 0, score: 0, previousGuesses: [] };
+        let claudeStats = { turns: 0, groups: 0, score: 0, previousGuesses: [] };
+        let usedWords = {
+            chatgpt: new Set(),
+            claude: new Set()
+        };
+        // Track grid positions and completed groups for each model
+        let gridPositions = {
+            chatgpt: [],
+            claude: []
+        };
+        let completedGroups = {
+            chatgpt: [],
+            claude: []
+        };
+
+        const newGameBtn = document.getElementById('newGameBtn');
+        const startBattleBtn = document.getElementById('startBattleBtn');
+        const gameInfo = document.getElementById('gameInfo');
+        const puzzleId = document.getElementById('puzzleId');
+        const puzzleDate = document.getElementById('puzzleDate');
+
+        newGameBtn.addEventListener('click', startNewGame);
+        startBattleBtn.addEventListener('click', startBattle);
+
+        async function startNewGame() {
+            const response = await fetch('/api/new-game');
+            const data = await response.json();
+            currentGame = data;
+            puzzleId.textContent = data.puzzle_id;
+            puzzleDate.textContent = data.date;
+            gameInfo.style.display = 'block';
+            startBattleBtn.disabled = false;
+
+            chatgptStats = { turns: 0, groups: 0, score: 0, previousGuesses: [], previousCorrect: [], previousIncorrect: [] };
+            claudeStats   = { turns: 0, groups: 0, score: 0, previousGuesses: [], previousCorrect: [], previousIncorrect: [] };
+            usedWords.chatgpt.clear();
+            usedWords.claude.clear();
+            gridPositions.chatgpt = [];
+            gridPositions.claude = [];
+            completedGroups.chatgpt = [];
+            completedGroups.claude = [];
+
+            updateGrids();
+            updateStats();
+            document.getElementById('chatgptStatus').textContent = 'Ready to play';
+            document.getElementById('claudeStatus').textContent = 'Ready to play';
+        }
+
+        function updateGrids() {
+            updateGrid('chatgptGrid', currentGame.words, 'chatgpt');
+            updateGrid('claudeGrid', currentGame.words, 'claude');
+        }
+
+        function updateGrid(gridId, words, model) {
+            const grid = document.getElementById(gridId);
+            const positions = gridPositions[model];
+            const completed = completedGroups[model];
+            
+            // Initialize positions if empty
+            if (positions.length === 0) {
+                positions.length = 16; // 4x4 grid
+                for (let i = 0; i < 16; i++) {
+                    positions[i] = words[i];
+                }
+            }
+            
+            grid.innerHTML = '';
+            
+            // Create the grid with current positions
+            for (let i = 0; i < 16; i++) {
+                const word = positions[i];
+                if (!word) continue; // Skip empty positions
+                
+                const wordElement = document.createElement('div');
+                wordElement.className = 'word';
+                wordElement.textContent = word;
+                wordElement.dataset.word = word;
+                wordElement.dataset.index = i;
+                
+                // Check if this word is part of a completed group
+                const isCompleted = completed.some(group => group.includes(word));
+                if (isCompleted) {
+                    wordElement.classList.add('completed-group');
+                }
+                
+                grid.appendChild(wordElement);
+            }
+        }
+
+        function moveGroupToTopRow(model, correctGuess) {
+            const positions = gridPositions[model];
+            const completed = completedGroups[model];
+            
+            // Find the next available top row positions
+            const topRowStart = completed.length * 4; // Each completed group takes 4 positions
+            
+            // Find current positions of the correct guess words
+            const currentPositions = [];
+            correctGuess.forEach(word => {
+                const index = positions.findIndex(pos => pos === word);
+                if (index !== -1) {
+                    currentPositions.push({ word, index });
+                }
+            });
+            
+            // Sort by current position to maintain order
+            currentPositions.sort((a, b) => a.index - b.index);
+            
+            // Create a copy of positions for manipulation
+            const newPositions = [...positions];
+            
+            // Move words to top row with minimal swaps
+            const swaps = [];
+            for (let i = 0; i < 4; i++) {
+                const targetIndex = topRowStart + i;
+                const wordToMove = currentPositions[i].word;
+                const currentIndex = currentPositions[i].index;
+                
+                if (targetIndex !== currentIndex) {
+                    // Find what's currently at the target position
+                    const wordAtTarget = newPositions[targetIndex];
+                    
+                    // Swap the words
+                    newPositions[targetIndex] = wordToMove;
+                    newPositions[currentIndex] = wordAtTarget;
+                    
+                    swaps.push({
+                        from: currentIndex,
+                        to: targetIndex,
+                        word: wordToMove
+                    });
+                }
+            }
+            
+            // Update positions
+            gridPositions[model] = newPositions;
+            
+            // Add to completed groups
+            completed.push(correctGuess);
+            
+            // Animate the movement
+            animateGroupMovement(model, swaps, correctGuess);
+        }
+
+        function animateGroupMovement(model, swaps, correctGuess) {
+            const grid = document.getElementById(`${model}Grid`);
+            const wordElements = grid.querySelectorAll('.word');
+            
+            // First, highlight ALL cells in the correct guess (regardless of whether they need to move)
+            wordElements.forEach(element => {
+                if (correctGuess.includes(element.dataset.word)) {
+                    element.classList.add('moving');
+                    // Add a brief highlight effect
+                    element.style.background = '#28a745';
+                    element.style.color = 'white';
+                    element.style.borderColor = '#1e7e34';
+                }
+            });
+            
+            // Update the grid after animation
+            setTimeout(() => {
+                updateGrid(`${model}Grid`, currentGame.words, model);
+            }, 800);
+        }
+
+        function updateStats() {
+            document.getElementById('chatgptTurns').textContent = chatgptStats.turns;
+            document.getElementById('chatgptGroups').textContent = chatgptStats.groups;
+            document.getElementById('chatgptScore').textContent = chatgptStats.score;
+            document.getElementById('claudeTurns').textContent = claudeStats.turns;
+            document.getElementById('claudeGroups').textContent = claudeStats.groups;
+            document.getElementById('claudeScore').textContent = claudeStats.score;
+        }
+
+        async function startBattle() {
+            if (!currentGame || gameInProgress) return;
+            gameInProgress = true;
+            startBattleBtn.disabled = true;
+            newGameBtn.disabled = true;
+
+            await Promise.all([aiTurn('chatgpt'), aiTurn('claude')]);
+            determineWinner();
+
+            gameInProgress = false;
+            startBattleBtn.disabled = false;
+            newGameBtn.disabled = false;
+        }
+
+        async function aiTurn(model) {
+            const stats = model === 'chatgpt' ? chatgptStats : claudeStats;
+            const statusEl = document.getElementById(`${model}Status`);
+
+            while (stats.groups < 4 && stats.turns < 10) {
+                statusEl.innerHTML = '<span class="loading"></span> Thinking...';
+                statusEl.className = 'status thinking';
+
+                const response = await fetch('/api/ai-turn', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        model,
+                        // only remove words this model has already found
+                        words: currentGame.words.filter(w => !usedWords[model].has(w)),
+                        previous_guesses: stats.previousGuesses,
+                        previous_correct:  stats.previousCorrect,
+                        puzzle_info:       currentGame.puzzle_info,
+                        solution:          currentGame.solution
+                    })
+                    });
+                const data = await response.json();
+                stats.turns++;
+
+                if (data.error) {
+                    statusEl.textContent = 'Error: ' + data.error;
+                    statusEl.className = 'status error';
+                    break;
+                }
+
+                if (data.result.correct) {
+                    stats.groups++;
+                    stats.score += (4 - data.result.level) * 10;
+                    data.guess.forEach(w => usedWords[model].add(w));
+                    stats.previousCorrect.push(data.guess);
+
+                    statusEl.textContent = `Found: ${data.result.group_name} …`;
+                    statusEl.className = 'status success';
+                    
+                    // Add a small delay to show the success state before animation
+                    setTimeout(() => {
+                        moveGroupToTopRow(model, data.guess);
+                    }, 500);
+                } else {
+                    stats.previousGuesses.push(data.guess);
+                    statusEl.textContent = `Incorrect: ${data.guess.join(', ')}`;
+                    statusEl.className = 'status error';
+                }
+
+                updateStats();
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+            if (stats.groups >= 4) {
+                statusEl.textContent = 'Puzzle completed!';
+                statusEl.className = 'status success';
+            } else if (stats.turns >= 10) {
+                statusEl.textContent = 'Max turns reached';
+                statusEl.className = 'status error';
+            }
+        }
+
+        function determineWinner() {
+            let winner, msg;
+            if (chatgptStats.groups === 4 && claudeStats.groups === 4) {
+                if (chatgptStats.turns < claudeStats.turns) {
+                    winner = 'ChatGPT'; msg = `ChatGPT wins in ${chatgptStats.turns} vs ${claudeStats.turns}`;
+                } else if (claudeStats.turns < chatgptStats.turns) {
+                    winner = 'Claude'; msg = `Claude wins in ${claudeStats.turns} vs ${chatgptStats.turns}`;
+                } else {
+                    winner = 'Tie'; msg = `Tie at ${chatgptStats.turns} turns each`;
+                }
+            } else if (chatgptStats.groups === 4) {
+                winner = 'ChatGPT'; msg = `ChatGPT wins with ${chatgptStats.turns} turns`;
+            } else if (claudeStats.groups === 4) {
+                winner = 'Claude'; msg = `Claude wins with ${claudeStats.turns} turns`;
+            } else {
+                winner = 'No Winner'; msg = 'Neither AI completed the puzzle';
+            }
+            const ann = document.createElement('div');
+            ann.className = 'winner-announcement';
+            ann.innerHTML = `<h2>🏆 ${winner} 🏆</h2><p>${msg}</p><button class="btn" onclick="ann.remove()">Close</button>`;
+            document.body.appendChild(ann);
+            setTimeout(() => ann.remove(), 5000);
+        }
+
+        // kick things off
+        startNewGame();
+    </script>
+</body>
+</html>
