@@ -48,7 +48,7 @@ class LLMClient:
                 response = await client.chat.completions.create(
                     model="gpt-4",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=150,
+                    max_tokens=1500,  # Increased for judge responses
                     temperature=0.7
                 )
                 return response.choices[0].message.content.strip()
@@ -65,8 +65,8 @@ class LLMClient:
                             "anthropic-version": "2023-06-01"
                         },
                         json={
-                            "model": "claude-3-haiku-20240307",
-                            "max_tokens": 150,
+                            "model": "claude-3-5-sonnet-20241022",
+                            "max_tokens": 1500,  # Increased for judge responses
                             "messages": [{"role": "user", "content": prompt}]
                         }
                     )
@@ -89,7 +89,7 @@ class LLMClient:
                 response = await client.chat.completions.create(
                     model="mixtral-8x7b-32768",
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=150,
+                    max_tokens=1500,  # Increased for judge responses
                     temperature=0.7
                 )
                 return response.choices[0].message.content.strip()

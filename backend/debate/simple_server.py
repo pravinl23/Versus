@@ -28,8 +28,12 @@ class CreateDebateRequest(BaseModel):
     topic: str
     model1: str = "gpt-4o-mini"
     model2: str = "gpt-4o-mini"
+    judge_model: str = "gpt-4o"
 
 class GenerateArgumentRequest(BaseModel):
+    debate_id: str
+
+class JudgeDebateRequest(BaseModel):
     debate_id: str
 
 @app.get("/")
@@ -48,7 +52,8 @@ async def create_debate(request: CreateDebateRequest):
         debate = SimpleDebate(
             topic=request.topic,
             model1=request.model1,
-            model2=request.model2
+            model2=request.model2,
+            judge_model=request.judge_model
         )
         
         # Store it
@@ -106,6 +111,30 @@ async def get_debate(debate_id: str):
         raise
     except Exception as e:
         print(f"❌ Error getting debate: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/judge-debate")
+async def judge_debate(request: JudgeDebateRequest):
+    """Judge a completed debate"""
+    try:
+        # Get debate
+        if request.debate_id not in active_debates:
+            raise HTTPException(status_code=404, detail="Debate not found")
+        
+        debate = active_debates[request.debate_id]
+        
+        # Judge the debate
+        result = await debate.judge_debate()
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error judging debate: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/debates")
