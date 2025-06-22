@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import './App.css'
+import Battleship from './components/games/Battleship/Battleship'
 import TriviaGame from './components/TriviaGame'
 import WordleGame from './components/games/WordleGame'
 
-const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
+const MODELS = ['gemini', 'anthropic', 'openai', 'groq', 'custom']
 const GAMES = [
   { name: 'Wordle', emoji: '📝', description: 'Word guessing' },
   { name: 'Trivia', emoji: '🧠', description: 'Test your knowledge' },
@@ -35,6 +36,13 @@ function MainMenu() {
         player2: player2Model
       })
       setGameStarted(true)
+    } else if (selectedGame.name === 'Battleship') {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+      setGameStarted(true)
     } else {
       console.log('Starting match:', {
         game: selectedGame.name,
@@ -44,22 +52,90 @@ function MainMenu() {
     }
   }
 
-  const handleBack = () => {
+  const handleBackToMenu = () => {
     setSelectedGame(null)
     setPlayer1Model('')
     setPlayer2Model('')
     setGameStarted(false)
   }
 
-  // If game is started and it's Wordle
-  if (gameStarted && selectedGame?.name === 'Wordle') {
-    return (
-      <WordleGame 
-        player1Model={player1Model}
-        player2Model={player2Model}
-        onBack={handleBack}
-      />
-    )
+  const handleBack = () => {
+    setGameStarted(false)
+  }
+
+  // If game has started, show the appropriate game component
+  if (gameStarted && selectedGame) {
+    // Handle Battleship
+    if (selectedGame.name === 'Battleship') {
+      return (
+        <div className="app">
+          <button 
+              onClick={handleBackToMenu}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                zIndex: 1000,
+                background: 'rgba(0, 0, 0, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                margin: 0
+              }}
+            >
+              ← Back to Menu
+            </button>
+          <Battleship 
+            player1Model={player1Model} 
+            player2Model={player2Model}
+            gameId={`game-${Date.now()}`} // Simple game ID for now
+          />
+        </div>
+      )
+    } 
+    // Handle Wordle
+    else if (selectedGame.name === 'Wordle') {
+      return (
+        <WordleGame 
+          player1Model={player1Model}
+          player2Model={player2Model}
+          onBack={handleBack}
+        />
+      )
+    } 
+    // Handle other games that aren't implemented yet
+    else {
+      return (
+        <div className="app">
+          <button 
+              onClick={handleBackToMenu}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                zIndex: 1000,
+                background: 'rgba(0, 0, 0, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                margin: 0
+              }}
+            >
+              ← Back to Menu
+            </button>
+          <div className="game-not-implemented">
+            <h2>{selectedGame.name} - Coming Soon!</h2>
+            <p>This game is not yet implemented.</p>
+          </div>
+        </div>
+      )
+    }
   }
 
   if (!selectedGame) {
@@ -89,9 +165,25 @@ function MainMenu() {
 
   return (
     <div className="app">
-      <button className="back-button" onClick={handleBack}>
-        ← Back
-      </button>
+      <button 
+          onClick={handleBackToMenu}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            color: '#fff',
+            padding: '0.5rem 1rem',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            margin: 0
+          }}
+        >
+          ← Back to Menu
+        </button>
       
       <div className="game-setup">
         <div className="selected-game-header">
@@ -109,7 +201,7 @@ function MainMenu() {
             >
               <option value="">Select LLM...</option>
               {MODELS.map((model) => (
-                <option key={model} value={model}>{model}</option>
+                <option key={model} value={model}>{model.toUpperCase()}</option>
               ))}
             </select>
           </div>
@@ -125,7 +217,7 @@ function MainMenu() {
             >
               <option value="">Select LLM...</option>
               {MODELS.map((model) => (
-                <option key={model} value={model}>{model}</option>
+                <option key={model} value={model}>{model.toUpperCase()}</option>
               ))}
             </select>
           </div>
