@@ -21,6 +21,7 @@
     "@vapi-ai/web": "^2.3.6",
     "lucide-react": "^0.522.0",
     "postprocessing": "^6.37.4",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2",

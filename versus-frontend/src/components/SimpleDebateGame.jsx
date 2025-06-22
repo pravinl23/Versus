@@ -19,7 +19,7 @@ const SimpleDebateGame = () => {
   const [currentlyTyping, setCurrentlyTyping] = useState(null); // {text: "", position: "PRO/CON", index: 0}
   const [typingComplete, setTypingComplete] = useState(true);
 
-  // Initialize Vapi (you'll need to add VAPI_API_KEY to your .env)
+  // Initialize Vapi (let it work normally for best voice quality - user won't interact)
   useEffect(() => {
     const vapiKey = import.meta.env.VITE_VAPI_API_KEY;
     if (vapiKey) {
@@ -27,7 +27,7 @@ const SimpleDebateGame = () => {
         const vapi = new Vapi(vapiKey);
         setVapiInstance(vapi);
         
-        // Listen to Vapi events
+        // Listen to Vapi events (perfect voice quality when allowed to work normally)
         vapi.on('call-start', () => {
           console.log('🎤 Voice call started');
           setCurrentSpeaking('vapi');
@@ -180,7 +180,7 @@ const SimpleDebateGame = () => {
   // Typewriter effect - shows words as they're spoken
   const startTypewriterEffect = (fullText, position) => {
     const words = fullText.split(' ');
-    const speechRate = 1.4;
+    const speechRate = 1.0; // Match the normal speech rate
     const avgWPM = 150 * speechRate; // Average words per minute * speech rate
     const msPerWord = (60 / avgWPM) * 1000; // Milliseconds per word
     
@@ -204,21 +204,99 @@ const SimpleDebateGame = () => {
     return () => clearInterval(typeInterval);
   };
 
-  // Speak argument using simple TTS (no interaction)
+  // Speak argument using Vapi as primary method
   const speakArgument = async (text, position) => {
     console.log(`🎤 Speaking ${position} argument:`, text);
     
-    // Try Web Speech API first (simple, no interaction)
+    // Primary: Use Vapi with proper event handling
+    if (vapiInstance) {
+      try {
+        // Stop any existing call
+        try {
+          vapiInstance.stop();
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (e) {
+          // Ignore if no active call
+        }
+
+        // Vapi configuration with perfect voice quality (let microphone work but user won't interact)
+        const assistant = {
+          voice: {
+            provider: "11labs",
+            voiceId: position === "PRO" ? "pNInz6obpgDQGcFmaJgB" : "21m00Tcm4TlvDq8ikWAM", // Elliot for PRO, Rachel for CON
+            speed: 1.0, // Normal speech rate
+            stability: 0.7, // More stable, less varying
+            similarityBoost: 0.8, // More natural sounding
+            style: 0.2, // Less dramatic, more conversational
+            useSpeakerBoost: true // Enhance speaker clarity
+          },
+          firstMessage: text
+          // No recordingEnabled: false - let Vapi work normally for best voice quality
+        };
+
+        console.log(`🎭 ${position} using Vapi voice: ${position === "PRO" ? "Elliot" : "Rachel"}`);
+
+        // Setup proper event listeners for this speech session
+        let cleanupTypewriter = null;
+        let speechPromiseResolver = null;
+
+        const speechPromise = new Promise((resolve) => {
+          speechPromiseResolver = resolve;
+        });
+
+        // Event handlers for this specific speech session
+        const handleSpeechStart = () => {
+          console.log('🗣️ Vapi started speaking');
+          setCurrentSpeaking('vapi');
+          cleanupTypewriter = startTypewriterEffect(text, position);
+        };
+
+        const handleSpeechEnd = () => {
+          console.log('🗣️ Vapi finished speaking');
+          setCurrentSpeaking(null);
+          if (cleanupTypewriter) cleanupTypewriter();
+          setCurrentlyTyping(null);
+          setTypingComplete(true);
+          // Remove event listeners
+          vapiInstance.off('speech-start', handleSpeechStart);
+          vapiInstance.off('speech-end', handleSpeechEnd);
+          vapiInstance.off('call-end', handleSpeechEnd);
+          if (speechPromiseResolver) speechPromiseResolver();
+        };
+
+        // Add event listeners for this speech session
+        vapiInstance.on('speech-start', handleSpeechStart);
+        vapiInstance.on('speech-end', handleSpeechEnd);
+        vapiInstance.on('call-end', handleSpeechEnd);
+
+        // Start Vapi call
+        await vapiInstance.start(assistant);
+
+        // Wait for speech to complete
+        await speechPromise;
+        
+        return Promise.resolve();
+        
+      } catch (error) {
+        console.error('❌ Vapi TTS failed:', error);
+        setCurrentSpeaking(null);
+        setCurrentlyTyping(null);
+        setTypingComplete(true);
+        // Fall through to Web Speech API fallback
+      }
+    }
+    
+    // Fallback: Use Web Speech API if Vapi fails
     if ('speechSynthesis' in window) {
       try {
+        console.log('🔄 Falling back to Web Speech API');
+        
         // Stop any existing speech
         window.speechSynthesis.cancel();
-        
-        // Wait a moment for the cancel to take effect
         await new Promise(resolve => setTimeout(resolve, 100));
         
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.4; // Much faster speech
+        utterance.rate = 1.0; // Normal human speech rate
         
         // Get available voices and select male/female
         const voices = window.speechSynthesis.getVoices();
@@ -237,7 +315,7 @@ const SimpleDebateGame = () => {
           
           if (maleVoice) {
             utterance.voice = maleVoice;
-            console.log(`🎭 PRO using voice: ${maleVoice.name}`);
+            console.log(`🎭 PRO using fallback voice: ${maleVoice.name}`);
           }
           utterance.pitch = 0.9; // Slightly lower for male
         } else {
@@ -254,7 +332,7 @@ const SimpleDebateGame = () => {
           
           if (femaleVoice) {
             utterance.voice = femaleVoice;
-            console.log(`🎭 CON using voice: ${femaleVoice.name}`);
+            console.log(`🎭 CON using fallback voice: ${femaleVoice.name}`);
           }
           utterance.pitch = 1.1; // Slightly higher for female
         }
@@ -265,29 +343,26 @@ const SimpleDebateGame = () => {
           
           utterance.onstart = () => {
             setCurrentSpeaking('tts');
-            console.log('🗣️ Started speaking');
-            // Start typewriter effect when speech begins
+            console.log('🗣️ Web TTS started speaking');
             cleanupTypewriter = startTypewriterEffect(text, position);
           };
           
           utterance.onend = () => {
             setCurrentSpeaking(null);
-            console.log('🗣️ Finished speaking');
-            // Cleanup typewriter effect
+            console.log('🗣️ Web TTS finished speaking');
             if (cleanupTypewriter) cleanupTypewriter();
             setCurrentlyTyping(null);
             setTypingComplete(true);
-            resolve(); // Resolve when speech finishes
+            resolve();
           };
           
           utterance.onerror = (e) => {
-            console.error('❌ Speech error:', e);
+            console.error('❌ Web Speech error:', e);
             setCurrentSpeaking(null);
-            // Cleanup typewriter effect on error
             if (cleanupTypewriter) cleanupTypewriter();
             setCurrentlyTyping(null);
             setTypingComplete(true);
-            resolve(); // Resolve even on error to continue
+            resolve();
           };
           
           // Ensure voices are loaded before speaking
@@ -301,52 +376,12 @@ const SimpleDebateGame = () => {
         });
         
       } catch (error) {
-        console.error('❌ Web Speech API failed:', error);
+        console.error('❌ Web Speech API also failed:', error);
       }
     }
     
-    // Fallback: Use Vapi but with strict TTS-only configuration
-    if (vapiInstance) {
-      try {
-        // Stop any existing call
-        try {
-          vapiInstance.stop();
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (e) {
-          // Ignore if no active call
-        }
-        
-        // Minimal TTS-only configuration
-        const assistant = {
-          voice: {
-            provider: "11labs",
-            voiceId: position === "PRO" ? "21m00Tcm4TlvDq8ikWAM" : "AZnzlk1XvdvUeBnXmlld"
-          },
-          firstMessage: text,
-          recordingEnabled: false
-        };
-
-        await vapiInstance.start(assistant);
-        
-        // Return a promise that resolves after expected speech duration
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            try {
-              vapiInstance.stop();
-            } catch (e) {
-              // Ignore
-            }
-            resolve();
-          }, Math.max(2000, text.length * 80));
-        });
-        
-      } catch (error) {
-        console.error('❌ Vapi TTS failed:', error);
-        return Promise.resolve(); // Return resolved promise on error
-      }
-    }
-    
-    // Return resolved promise if no voice available
+    // If both methods fail, return resolved promise
+    console.log('⚠️ No voice synthesis available');
     return Promise.resolve();
   };
 
