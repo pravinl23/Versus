@@ -7,7 +7,7 @@ import Battleship from "./components/games/Battleship/Battleship"
 import TriviaGame from "./components/TriviaGame"
 import WordleGame from "./components/games/WordleGame"
 import ConnectionsGame from "./components/games/ConnectionsGame"
-import SimpleDebateGame from "./components/SimpleDebateGame"
+import DebateGame from "./components/DebateGame"
 import NewLandingPage from "./pages/LandingPage"
 import ModelSelection from "./pages/ModelSelection"
 import VotePage from "./pages/VotePage"
@@ -42,12 +42,13 @@ function MainMenu() {
         },
       })
     } else if (game.name === "Debate") {
-      navigate('/debate', { 
-        state: { 
-          player1Model, 
-          player2Model 
-        } 
+      console.log("Starting match:", {
+        game: game.name,
+        player1: player1Model,
+        player2: player2Model,
       })
+      setSelectedGame(game)
+      setGameStarted(true)
     } else if (game.name === "Wordle") {
       console.log("Starting match:", {
         game: game.name,
@@ -120,6 +121,37 @@ function MainMenu() {
             player1Model={player1Model}
             player2Model={player2Model}
             gameId={`game-${Date.now()}`} // Simple game ID for now
+          />
+        </div>
+      )
+    }
+    // Handle Debate
+    else if (selectedGame.name === "Debate") {
+      return (
+        <div className="app">
+          <button
+            onClick={handleBackToMenu}
+            style={{
+              position: "fixed",
+              top: "10px",
+              left: "10px",
+              zIndex: 10000,
+              background: "rgba(0, 0, 0, 0.8)",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              color: "#fff",
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "0.9rem",
+              margin: 0,
+            }}
+          >
+            ← Back to Menu
+          </button>
+          <DebateGame
+            player1Model={player1Model}
+            player2Model={player2Model}
+            onBack={handleBackToMenu}
           />
         </div>
       )
@@ -206,7 +238,7 @@ function App() {
         <Route path="/model-selection" element={<ModelSelection />} />
         <Route path="/games" element={<MainMenu />} />
         <Route path="/trivia" element={<TriviaGame />} />
-        <Route path="/debate" element={<SimpleDebateGame />} />
+        <Route path="/debate" element={<DebateGame />} />
         <Route path="/vote" element={<VotePage />} />
       </Routes>
     </Router>

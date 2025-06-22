@@ -26,6 +26,7 @@ from src.games.trivia.trivia_game import TriviaGame
 from src.games.trivia.questions import TRIVIA_QUESTIONS, get_random_questions
 from src.games.wordle.wordle_game import WordleGame
 from src.games.nyt_connections.connections_game import ConnectionsGame
+from src.games.debate.debate_game import DebateGame
 
 # Import Flask app for Wordle (we'll integrate it)
 from src.games.wordle.wordle_simple import app as wordle_flask_app, WordleGame as WordleSimpleGame, get_llm_guess, parse_reasoning_for_ui
@@ -63,6 +64,7 @@ battleship_games = {}  # Add this to store battleship games
 trivia_sessions: Dict[str, Dict] = {}
 wordle_games: Dict[str, WordleSimpleGame] = {}
 connections_games: Dict[str, ConnectionsGame] = {}
+debate_games: Dict[str, DebateGame] = {}
 
 # Connection manager for WebSockets
 class ConnectionManager:
@@ -763,6 +765,85 @@ async def get_connections_state(game_id: str):
         "player2_model": session["player2_model"]
     }
 
+# =================
+# DEBATE ENDPOINTS
+# =================
+
+@app.websocket("/games/debate/{game_id}")
+async def debate_websocket(websocket: WebSocket, game_id: str):
+    """WebSocket endpoint for Debate games"""
+    await websocket.accept()
+    print(f"Client connected to debate game {game_id}")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            if data.get("type") == "start_debate":
+                # Check if game already exists
+                if game_id in debate_games:
+                    game = debate_games[game_id]
+                    print(f"Debate {game_id} already exists, sending current state")
+                    
+                    # Send current game state
+                    await websocket.send_json({
+                        "type": "game_state",
+                        "state": game.get_state()
+                    })
+                    continue
+                
+                # Create new debate
+                topic = data.get("topic", "")
+                player1_model = data.get("player1Model", "gpt-4o-mini")
+                player2_model = data.get("player2Model", "claude-3-haiku")
+                judge_model = data.get("judgeModel", "gpt-4o")
+                
+                if not topic:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Topic is required"
+                    })
+                    continue
+                
+                print(f"Creating new debate {game_id} - Topic: {topic}")
+                print(f"Models: {player1_model} (PRO) vs {player2_model} (CON), Judge: {judge_model}")
+                
+                # Create debate game
+                game = DebateGame(game_id, player1_model, player2_model)
+                debate_games[game_id] = game
+                
+                # Set WebSocket for broadcasting
+                game.websocket = websocket
+                
+                # Initialize debate with topic
+                await game.initialize(topic, judge_model)
+                
+            elif data.get("type") == "get_state":
+                # Handle request for current game state
+                if game_id in debate_games:
+                    game = debate_games[game_id]
+                    await websocket.send_json({
+                        "type": "game_state",
+                        "state": game.get_state()
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Debate not found"
+                    })
+            
+    except WebSocketDisconnect:
+        print(f"Client disconnected from debate game {game_id}")
+        # Clean up game if needed
+        if game_id in debate_games:
+            game = debate_games[game_id]
+            if hasattr(game, 'websocket'):
+                game.websocket = None
+    except Exception as e:
+        print(f"WebSocket error in debate {game_id}: {e}")
+        import traceback
+        traceback.print_exc()
+
 # ===================
 # VOTING ENDPOINTS
 # ===================
@@ -880,13 +961,15 @@ async def root():
             "battleship": {"active": len([g for g in active_games.items() if g[1].get("type") == "battleship"])},
             "trivia": {"active": len(trivia_sessions)},
             "wordle": {"active": len(wordle_games)},
-            "connections": {"active": len(connections_games)}
+            "connections": {"active": len(connections_games)},
+            "debate": {"active": len(debate_games)}
         },
         "endpoints": {
             "battleship": "/games/battleship/{game_id}",
             "trivia": "/api/trivia/*",
             "wordle": "/api/wordle/*",
-            "connections": "/api/connections/*"
+            "connections": "/api/connections/*",
+            "debate": "/games/debate/{game_id}"
         }
     }
 
@@ -899,7 +982,8 @@ async def health_check():
             "battleship": "ready",
             "trivia": "ready",
             "wordle": "ready",
-            "connections": "ready"
+            "connections": "ready",
+            "debate": "ready"
         }
     }
 
@@ -922,6 +1006,7 @@ if __name__ == "__main__":
     print("  - Trivia: API at /api/trivia/*")
     print("  - Wordle: API at /api/wordle/*")
     print("  - NYT Connections: API at /api/connections/*")
+    print("  - Debate: WebSocket at /games/debate/{game_id}")
     print("-" * 50)
     
     uvicorn.run(app, host="0.0.0.0", port=8000) 

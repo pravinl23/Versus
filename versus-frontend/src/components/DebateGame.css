@@ -1,0 +1,487 @@
+/* Debate Game Styles */
+.debate-game {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'VT323', monospace;
+  padding-right: 60px; /* Account for sidebar */
+}
+
+/* Topic Modal */
+.topic-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.topic-modal {
+  background: #111;
+  border: 2px solid #333;
+  border-radius: 12px;
+  padding: 3rem;
+  max-width: 600px;
+  width: 90%;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.topic-modal-title {
+  font-size: 2.5rem;
+  color: #fff;
+  margin-bottom: 1rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.topic-modal-subtitle {
+  font-size: 1.3rem;
+  color: #999;
+  text-align: center;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.topic-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  font-size: 1.3rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-family: 'VT323', monospace;
+  margin-bottom: 2rem;
+  transition: all 0.3s ease;
+}
+
+.topic-input:focus {
+  outline: none;
+  border-color: #666;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.topic-modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.topic-cancel-button,
+.topic-start-button {
+  padding: 0.8rem 2rem;
+  font-size: 1.2rem;
+  font-family: 'VT323', monospace;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+
+.topic-cancel-button {
+  background: transparent;
+  border: 2px solid #666;
+  color: #999;
+}
+
+.topic-cancel-button:hover {
+  border-color: #999;
+  color: #fff;
+}
+
+.topic-start-button {
+  background: #4CAF50;
+  color: #000;
+  font-weight: bold;
+}
+
+.topic-start-button:hover {
+  background: #5CBF60;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+/* Debate Header */
+.debate-header {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1rem;
+  padding-right: calc(1rem + 60px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  flex-shrink: 0;
+  height: 80px;
+}
+
+.debate-topic {
+  text-align: center;
+  flex: 1;
+}
+
+.debate-topic h2 {
+  font-size: 1.8rem;
+  color: #fff;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.debate-status {
+  font-size: 1.2rem;
+  color: #999;
+}
+
+/* Debate Container */
+.debate-container {
+  display: flex;
+  flex: 1;
+  width: calc(100% - 60px);
+  margin: 0 auto;
+  padding: 2rem;
+  gap: 2rem;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+/* Debate Sides */
+.debate-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.debate-side.speaking {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+}
+
+.pro-side {
+  border-left: 3px solid #2196F3;
+}
+
+.con-side {
+  border-right: 3px solid #F44336;
+}
+
+/* Debater Header */
+.debater-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debater-header h3 {
+  font-size: 1.8rem;
+  color: #fff;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.position-label {
+  font-size: 1.2rem;
+  padding: 0.3rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.pro-side .position-label {
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196F3;
+}
+
+.con-side .position-label {
+  background: rgba(244, 67, 54, 0.2);
+  color: #F44336;
+}
+
+/* Arguments List */
+.arguments-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.arguments-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.arguments-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.arguments-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.argument-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.con-side .argument-card {
+  animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.argument-round {
+  font-size: 1rem;
+  color: #999;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.argument-text {
+  font-size: 1.2rem;
+  color: #fff;
+  line-height: 1.6;
+}
+
+/* Center Divider */
+.debate-divider {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.vs-text {
+  font-size: 3rem;
+  color: #666;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.speaking-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: #4CAF50;
+}
+
+.speaking-dot {
+  width: 12px;
+  height: 12px;
+  background: #4CAF50;
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.7; }
+}
+
+/* Judgment Section */
+.judgment-section {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 60px;
+  background: rgba(0, 0, 0, 0.95);
+  border-top: 2px solid #FFD700;
+  padding: 2rem;
+  animation: slideUp 0.5s ease-out;
+}
+
+.judgment-title {
+  font-size: 2rem;
+  color: #FFD700;
+  text-align: center;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.judgment-scores {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+  margin-bottom: 2rem;
+}
+
+.score-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  min-width: 250px;
+}
+
+.pro-score {
+  border-color: #2196F3;
+}
+
+.con-score {
+  border-color: #F44336;
+}
+
+.score-card h4 {
+  font-size: 1.3rem;
+  color: #fff;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.score-details {
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-bottom: 1rem;
+}
+
+.score-details div {
+  margin-bottom: 0.3rem;
+}
+
+.total-score {
+  font-size: 1.5rem;
+  color: #FFD700;
+  text-align: center;
+  font-weight: bold;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.winner-announcement {
+  text-align: center;
+}
+
+.trophy {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.winner-name {
+  font-size: 2rem;
+  color: #FFD700;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 0.5rem;
+}
+
+.margin {
+  font-size: 1.3rem;
+  color: #999;
+}
+
+.judgment-analysis {
+  max-width: 800px;
+  margin: 0 auto 2rem;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #ccc;
+  line-height: 1.6;
+}
+
+.back-to-menu-button {
+  display: block;
+  margin: 0 auto;
+  padding: 0.8rem 2rem;
+  font-size: 1.3rem;
+  font-family: 'VT323', monospace;
+  background: #4CAF50;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+
+.back-to-menu-button:hover {
+  background: #5CBF60;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+/* Connection Status */
+.connection-status {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
+} 
