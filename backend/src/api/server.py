@@ -23,6 +23,7 @@ from src.games.battleship.battleship import BattleshipGame
 from src.games.trivia.trivia_game import TriviaGame
 from src.games.trivia.questions import TRIVIA_QUESTIONS, get_random_questions
 from src.games.wordle.wordle_game import WordleGame
+from src.games.nyt_connections.connections_game import ConnectionsGame
 
 # Import Flask app for Wordle (we'll integrate it)
 from src.games.wordle.wordle_simple import app as wordle_flask_app, WordleGame as WordleSimpleGame, get_llm_guess, parse_reasoning_for_ui
@@ -31,7 +32,8 @@ from src.games.wordle.wordle_simple import app as wordle_flask_app, WordleGame a
 DEFAULT_MODELS = {
     "battleship": {"player1": "openai", "player2": "anthropic"},
     "trivia": {"player1": "openai", "player2": "anthropic"},
-    "wordle": {"player1": "openai", "player2": "anthropic"}
+    "wordle": {"player1": "openai", "player2": "anthropic"},
+    "connections": {"player1": "openai", "player2": "anthropic"}
 }
 
 def get_models_for_game(game_type: str, player1_model: Optional[str] = None, player2_model: Optional[str] = None):
@@ -57,6 +59,7 @@ app.add_middleware(
 active_games: Dict[str, Dict] = {}
 trivia_sessions: Dict[str, Dict] = {}
 wordle_games: Dict[str, WordleSimpleGame] = {}
+connections_games: Dict[str, ConnectionsGame] = {}
 
 # Connection manager for WebSockets
 class ConnectionManager:
@@ -517,6 +520,150 @@ async def make_wordle_guess_no_id(request: dict):
         "winner": result['winner']
     }
 
+# =======================
+# NYT CONNECTIONS ENDPOINTS
+# =======================
+
+class ConnectionsStartRequest(BaseModel):
+    player1_model: Optional[str] = None
+    player2_model: Optional[str] = None
+
+@app.post("/api/connections/start")
+async def start_connections_game(request: ConnectionsStartRequest):
+    """Start a new NYT Connections game"""
+    try:
+        game_id = str(uuid.uuid4())
+        
+        # Map model IDs to backend format
+        def map_model_to_backend(model_id):
+            if not model_id:
+                return "openai"  # default fallback
+            model_id = model_id.lower()
+            if "gpt" in model_id or "openai" in model_id:
+                return "openai"
+            elif "claude" in model_id or "anthropic" in model_id:
+                return "anthropic"
+            elif "gemini" in model_id or "google" in model_id:
+                return "gemini"
+            elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
+                return "groq"
+            else:
+                return "openai"  # default fallback
+        
+        # Create two separate games with the same puzzle
+        game1 = ConnectionsGame()
+        game2 = ConnectionsGame(puzzle_data=game1.puzzle)  # Use same puzzle
+        
+        # Store games with model mapping
+        connections_games[game_id] = {
+            "player1_game": game1,
+            "player2_game": game2,
+            "player1_model": request.player1_model,
+            "player2_model": request.player2_model,
+            "player1_backend": map_model_to_backend(request.player1_model),
+            "player2_backend": map_model_to_backend(request.player2_model)
+        }
+        
+        return {
+            "game_id": game_id,
+            "status": "started",
+            "puzzle_id": game1.id,
+            "date": game1.date,
+            "words": game1.all_words,
+            "player1_model": request.player1_model,
+            "player2_model": request.player2_model
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start game: {str(e)}")
+
+@app.websocket("/api/connections/ws/{game_id}")
+async def connections_websocket(websocket: WebSocket, game_id: str):
+    """WebSocket endpoint for NYT Connections real-time updates"""
+    await manager.connect(websocket, game_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                if message.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+            except:
+                pass
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, game_id)
+
+@app.post("/api/connections/game/{game_id}/player/{player:int}/ai-turn")
+async def connections_ai_turn(game_id: str, player: int, request: dict):
+    """Process an AI turn for NYT Connections"""
+    if game_id not in connections_games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    session = connections_games[game_id]
+    
+    # Get the appropriate game and model for this player
+    if player == 1:
+        game = session["player1_game"]
+        backend_model = session["player1_backend"]
+        display_model = session["player1_model"]
+    else:
+        game = session["player2_game"]
+        backend_model = session["player2_backend"]
+        display_model = session["player2_model"]
+    
+    if game.game_over:
+        return {"error": "Game is already over"}
+    
+    try:
+        # Get AI guess
+        guess = game.get_ai_guess(backend_model)
+        
+        if not guess:
+            return {"error": "Failed to get AI guess"}
+        
+        # Make the guess
+        result = game.make_guess(display_model, guess)
+        
+        # Broadcast update
+        await manager.broadcast_to_game(
+            json.dumps({
+                "type": "game_update",
+                "data": {
+                    "player": player,
+                    "model": display_model,
+                    "guess": guess,
+                    "result": result,
+                    "game_state": game.get_game_state()
+                }
+            }),
+            game_id
+        )
+        
+        return {
+            "player": player,
+            "model": display_model,
+            "guess": guess,
+            "result": result,
+            "game_state": game.get_game_state()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/connections/game/{game_id}/state")
+async def get_connections_state(game_id: str):
+    """Get current NYT Connections game state"""
+    if game_id not in connections_games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    session = connections_games[game_id]
+    return {
+        "player1_state": session["player1_game"].get_game_state(),
+        "player2_state": session["player2_game"].get_game_state(),
+        "player1_model": session["player1_model"],
+        "player2_model": session["player2_model"]
+    }
+
 # ====================
 # COMMON ENDPOINTS
 # ====================
@@ -530,12 +677,14 @@ async def root():
         "games": {
             "battleship": {"active": len([g for g in active_games.items() if g[1].get("type") == "battleship"])},
             "trivia": {"active": len(trivia_sessions)},
-            "wordle": {"active": len(wordle_games)}
+            "wordle": {"active": len(wordle_games)},
+            "connections": {"active": len(connections_games)}
         },
         "endpoints": {
             "battleship": "/games/battleship/{game_id}",
             "trivia": "/api/trivia/*",
-            "wordle": "/api/wordle/*"
+            "wordle": "/api/wordle/*",
+            "connections": "/api/connections/*"
         }
     }
 
@@ -547,7 +696,8 @@ async def health_check():
         "games": {
             "battleship": "ready",
             "trivia": "ready",
-            "wordle": "ready"
+            "wordle": "ready",
+            "connections": "ready"
         }
     }
 
@@ -569,6 +719,7 @@ if __name__ == "__main__":
     print("  - Battleship: WebSocket at /games/battleship/{game_id}")
     print("  - Trivia: API at /api/trivia/*")
     print("  - Wordle: API at /api/wordle/*")
+    print("  - NYT Connections: API at /api/connections/*")
     print("-" * 50)
     
     uvicorn.run(app, host="0.0.0.0", port=8000) 

@@ -23,6 +23,7 @@ def main():
     print("  - Battleship: WebSocket at /games/battleship/{game_id}")
     print("  - Trivia: API at /api/trivia/*")
     print("  - Wordle: API at /api/wordle/*")
+    print("  - NYT Connections: API at /api/connections/*")
     print("-" * 50)
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

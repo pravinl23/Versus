@@ -6,6 +6,7 @@ import "./App.css"
 import Battleship from "./components/games/Battleship/Battleship"
 import TriviaGame from "./components/TriviaGame"
 import WordleGame from "./components/games/WordleGame"
+import ConnectionsGame from "./components/games/ConnectionsGame"
 import NewLandingPage from "./pages/LandingPage"
 import ModelSelection from "./pages/ModelSelection"
 
@@ -48,6 +49,14 @@ function MainMenu() {
       setSelectedGame(game)
       setGameStarted(true)
     } else if (game.name === "Battleship") {
+      console.log("Starting match:", {
+        game: game.name,
+        player1: player1Model,
+        player2: player2Model,
+      })
+      setSelectedGame(game)
+      setGameStarted(true)
+    } else if (game.name === "NYT Connections") {
       console.log("Starting match:", {
         game: game.name,
         player1: player1Model,
@@ -110,6 +119,10 @@ function MainMenu() {
     // Handle Wordle
     else if (selectedGame.name === "Wordle") {
       return <WordleGame player1Model={player1Model} player2Model={player2Model} onBack={handleBack} />
+    }
+    // Handle NYT Connections
+    else if (selectedGame.name === "NYT Connections") {
+      return <ConnectionsGame player1Model={player1Model} player2Model={player2Model} onBack={handleBackToMenu} />
     }
     // Handle other games that aren't implemented yet
     else {
