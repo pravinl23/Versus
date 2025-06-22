@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Settings } from 'lucide-react';
 
-const QRCodeVote = ({ gameId, className = '' }) => {
+const QRCodeVote = ({ gameId, className = '', size = 180 }) => {
   const [displayUrl, setDisplayUrl] = useState('');
   const [showIpConfig, setShowIpConfig] = useState(false);
   const [manualIP, setManualIP] = useState('');
@@ -145,10 +145,10 @@ const QRCodeVote = ({ gameId, className = '' }) => {
 
       {/* Optional IP Configuration */}
       {showIpConfig && (
-        <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+        <div className="mb-6 p-4 bg-black rounded-lg border border-gray-600">
           <h4 className="text-sm font-medium text-white mb-3">Network Configuration</h4>
           
-          <div className="mb-3 p-2 bg-gray-900 rounded text-xs">
+          <div className="mb-3 p-2 bg-black border border-gray-700 rounded text-xs">
             <p className="text-gray-400 mb-1">Current Status:</p>
             {detectedIP && (
               <p className="text-green-400">Detected IP: {detectedIP}</p>
@@ -165,10 +165,10 @@ const QRCodeVote = ({ gameId, className = '' }) => {
               placeholder={detectedIP || "e.g., 10.56.123.217"}
               value={manualIP}
               onChange={(e) => setManualIP(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm bg-black text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             />
             <p className="text-xs text-gray-400">
-              💡 Find your IP: <code className="bg-gray-700 px-1 rounded">ifconfig | grep inet</code> (Mac) or <code className="bg-gray-700 px-1 rounded">ipconfig</code> (Windows)
+              💡 Find your IP: <code className="bg-black border border-gray-600 px-1 rounded">ifconfig | grep inet</code> (Mac) or <code className="bg-black border border-gray-600 px-1 rounded">ipconfig</code> (Windows)
             </p>
             <div className="flex space-x-2 flex-wrap">
               <button
@@ -186,7 +186,7 @@ const QRCodeVote = ({ gameId, className = '' }) => {
               </button>
               <button
                 onClick={() => setShowIpConfig(false)}
-                className="px-3 py-2 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                className="px-3 py-2 text-xs bg-black border border-gray-600 hover:bg-gray-900 text-white rounded transition-colors"
               >
                 Cancel
               </button>
@@ -200,7 +200,7 @@ const QRCodeVote = ({ gameId, className = '' }) => {
         <div className="bg-white p-4 rounded-xl shadow-lg">
           <QRCodeSVG
             value={displayUrl || `http://10.56.123.217:5174/vote?gameId=${gameId}`}
-            size={180}
+            size={size}
             level="M"
             includeMargin={true}
             fgColor="#000000"
@@ -210,7 +210,7 @@ const QRCodeVote = ({ gameId, className = '' }) => {
       </div>
       
       <div className="text-center">
-        <p className="text-xs text-green-400 break-all font-mono bg-gray-800 p-2 rounded">
+        <p className="text-xs text-green-400 break-all font-mono bg-black border border-gray-600 p-2 rounded">
           {displayUrl || 'Detecting IP...'}
         </p>
         <p className="text-xs text-gray-400 mt-2">
