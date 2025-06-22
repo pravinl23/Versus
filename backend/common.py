@@ -20,83 +20,94 @@ class LLMClient:
     
     def _initialize_client(self):
         if self.model_type == "OPENAI":
-            from openai import AsyncOpenAI
-            return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            from openai import OpenAI
+            return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.model_type == "ANTHROPIC":
-            from anthropic import AsyncAnthropic
-            return AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            from anthropic import Anthropic
+            return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         elif self.model_type == "GEMINI":
             import google.generativeai as genai
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
             return genai
         elif self.model_type == "GROQ":
-            from groq import AsyncGroq
-            return AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+            from groq import Groq
+            return Groq(api_key=os.getenv("GROQ_API_KEY"))
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
     
-    async def get_move(self, prompt: str) -> str:
+    def get_move(self, prompt: str, game_state: dict = None) -> str:
         """Get a move from the LLM"""
         try:
             if self.model_type == "OPENAI":
-                response = await self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model="gpt-4o-mini",  # Using a faster model for games
                     messages=[
-                        {"role": "system", "content": "You are an expert game player. Respond only with the requested move format."},
+                        {"role": "system", "content": "You are an expert battleship player. Respond with ONLY the coordinate (e.g. 'A5' or 'H8'). No other text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
-                    max_tokens=50
+                    max_tokens=10  # Reduced since we only need a coordinate
                 )
-                return response.choices[0].message.content.strip()
+                content = response.choices[0].message.content.strip()
                 
             elif self.model_type == "ANTHROPIC":
-                response = await self.client.messages.create(
+                response = self.client.messages.create(
                     model="claude-3-haiku-20240307",  # Using a faster model for games
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
-                    max_tokens=50,
+                    max_tokens=10,
                     temperature=0.7
                 )
-                return response.content[0].text.strip()
+                content = response.content[0].text.strip()
                 
             elif self.model_type == "GROQ":
-                response = await self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model="llama3-8b-8192",
                     messages=[
-                        {"role": "system", "content": "You are an expert game player. Respond only with the requested move format."},
+                        {"role": "system", "content": "You are an expert battleship player. Respond with ONLY the coordinate (e.g. 'A5' or 'H8'). No other text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
-                    max_tokens=50
+                    max_tokens=10
                 )
-                return response.choices[0].message.content.strip()
+                content = response.choices[0].message.content.strip()
                 
             elif self.model_type == "GEMINI":
-                # Gemini is not async by default, so we run it in executor
                 model = self.client.GenerativeModel('gemini-pro')
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: model.generate_content(prompt)
-                )
-                return response.text.strip()
+                response = model.generate_content(prompt)
+                content = response.text.strip()
                 
             else:
                 # Fallback for testing - make random valid moves
                 import random
                 import string
-                col = random.choice(string.ascii_uppercase[:10])
-                row = random.randint(1, 10)
+                col = random.choice(string.ascii_uppercase[:8])
+                row = random.randint(1, 8)
                 return f"{col}{row}"
+            
+            # Clean up the response - extract just the coordinate
+            import re
+            # Look for pattern like A5, H8, etc.
+            coord_match = re.search(r'[A-Ha-h][1-8]', content)
+            if coord_match:
+                return coord_match.group(0).upper()
+            
+            # If no valid coordinate found, try to extract any letter-number combo
+            parts = re.findall(r'[A-Ha-h]|[1-8]', content)
+            if len(parts) >= 2:
+                return parts[0].upper() + parts[1]
+            
+            # Last resort - return the whole content
+            return content.upper()
                 
         except Exception as e:
             print(f"Error getting move from {self.model_type}: {e}")
             # Return a fallback move
             import random
             import string
-            col = random.choice(string.ascii_uppercase[:10])
-            row = random.randint(1, 10)
+            col = random.choice(string.ascii_uppercase[:8])
+            row = random.randint(1, 8)
             return f"{col}{row}"
 
 
@@ -140,7 +151,7 @@ class BaseGame(ABC):
         """Switch to the other player"""
         self.current_player = 3 - self.current_player  # Switches between 1 and 2
     
-    async def play_turn(self) -> Dict[str, Any]:
+    def play_turn(self) -> Dict[str, Any]:
         """Play one turn of the game"""
         # Get current player's LLM
         current_llm = self.player1 if self.current_player == 1 else self.player2
@@ -152,7 +163,7 @@ class BaseGame(ABC):
         max_retries = 3
         for attempt in range(max_retries):
             # Get move from LLM
-            move = await current_llm.get_move(prompt)
+            move = current_llm.get_move(prompt)
             
             # Clean up the move (remove extra text if any)
             move = move.split()[0] if move else ""

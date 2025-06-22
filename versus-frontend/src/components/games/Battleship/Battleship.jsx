@@ -5,7 +5,7 @@ import useGameWebSocket from '../../../hooks/useGameWebSocket';
 import { GAME_STATUS, GAME_MESSAGES } from '../../../utils/gameUtils';
 import './Battleship.css';
 
-const BOARD_SIZE = 10;
+const BOARD_SIZE = 8;
 
 const Battleship = ({ player1Model, player2Model, gameId }) => {
   // Game state
@@ -38,12 +38,32 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   // Handle game state updates from WebSocket
   useEffect(() => {
     if (gameState) {
-      setCurrentPlayer(gameState.currentPlayer);
-      if (gameState.player1Shots) setPlayer1Shots(gameState.player1Shots);
-      if (gameState.player2Shots) setPlayer2Shots(gameState.player2Shots);
-      setGameStatus(gameState.status);
-      setWinner(gameState.winner);
-      setMessage(gameState.message || message);
+      // Handle different message types
+      if (gameState.type === 'ship_placed') {
+        // Update board with ship placement
+        if (gameState.player === 1) {
+          setPlayer1Board(gameState.board);
+        } else {
+          setPlayer2Board(gameState.board);
+        }
+        setMessage(`${gameState.ship} placed for Player ${gameState.player}`);
+      } else if (gameState.type === 'placement_complete') {
+        // Ships are all placed, update both boards
+        setPlayer1Board(gameState.player1Board);
+        setPlayer2Board(gameState.player2Board);
+        setMessage(gameState.message);
+        setGameStatus(GAME_STATUS.IN_PROGRESS);
+      } else if (gameState.type === 'placement_start') {
+        setMessage(gameState.message);
+      } else if (gameState.type === 'game_state') {
+        // Regular game state update
+        setCurrentPlayer(gameState.currentPlayer);
+        if (gameState.player1Shots) setPlayer1Shots(gameState.player1Shots);
+        if (gameState.player2Shots) setPlayer2Shots(gameState.player2Shots);
+        if (gameState.status) setGameStatus(gameState.status);
+        if (gameState.winner) setWinner(gameState.winner);
+        if (gameState.message) setMessage(gameState.message);
+      }
     }
   }, [gameState]);
 
@@ -63,13 +83,43 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     const isHit = shots[row][col] === 'hit';
     const isMiss = shots[row][col] === 'miss';
 
-    if (isHit) {
-      return <div className="cell-hit">💥</div>;
-    } else if (isMiss) {
+    if (isMiss && !cellValue) {
+      // Miss in empty water
       return <div className="cell-miss">💨</div>;
     } else if (cellValue) {
-      // In AI vs AI, we don't show ships
-      return null;
+      // Show ship with different colors based on ship type
+      const shipColors = {
+        'carrier': '#FF6B6B',     // Red
+        'battleship': '#4ECDC4',  // Teal
+        'destroyer': '#45B7D1',   // Blue
+        'submarine': '#96CEB4',   // Green
+        'patrol': '#DDA0DD'       // Plum
+      };
+      
+      // If hit, show both ship and hit marker
+      if (isHit) {
+        return (
+          <div 
+            className="cell-ship cell-ship-hit" 
+            style={{ backgroundColor: shipColors[cellValue] || '#666' }}
+            title={`${cellValue} - HIT!`}
+          >
+            <span className="ship-icon">🚢</span>
+            <span className="hit-overlay">💥</span>
+          </div>
+        );
+      } else {
+        // Just show the ship
+        return (
+          <div 
+            className="cell-ship" 
+            style={{ backgroundColor: shipColors[cellValue] || '#666' }}
+            title={cellValue}
+          >
+            🚢
+          </div>
+        );
+      }
     }
     return null;
   };
@@ -107,50 +157,56 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
             <div className="board-container">
               <h4>Defense Grid</h4>
               <div className="board-with-labels">
-                <div className="column-labels">
-                  <div className="empty-cell"></div>
-                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                    <div key={i} className="label">{getColumnLabel(i)}</div>
-                  ))}
-                </div>
-                <div className="board-row-container">
-                  <div className="row-labels">
-                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                      <div key={i} className="label">{i + 1}</div>
+                <table className="battleship-table">
+                  <thead>
+                    <tr>
+                      <th className="corner-cell"></th>
+                      {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                        <th key={i} className="col-label">{getColumnLabel(i)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: BOARD_SIZE }, (_, row) => (
+                      <tr key={row}>
+                        <td className="row-label">{row + 1}</td>
+                        {Array.from({ length: BOARD_SIZE }, (_, col) => (
+                          <td key={`${row}-${col}`} className="game-cell own-cell">
+                            {renderOwnBoard(1)(row, col)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </div>
-                  <GameBoard
-                    rows={BOARD_SIZE}
-                    cols={BOARD_SIZE}
-                    renderCell={renderOwnBoard(1)}
-                    className="own-board small"
-                  />
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
             
             <div className="board-container">
               <h4>Attack Grid</h4>
               <div className="board-with-labels">
-                <div className="column-labels">
-                  <div className="empty-cell"></div>
-                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                    <div key={i} className="label">{getColumnLabel(i)}</div>
-                  ))}
-                </div>
-                <div className="board-row-container">
-                  <div className="row-labels">
-                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                      <div key={i} className="label">{i + 1}</div>
+                <table className="battleship-table">
+                  <thead>
+                    <tr>
+                      <th className="corner-cell"></th>
+                      {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                        <th key={i} className="col-label">{getColumnLabel(i)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: BOARD_SIZE }, (_, row) => (
+                      <tr key={row}>
+                        <td className="row-label">{row + 1}</td>
+                        {Array.from({ length: BOARD_SIZE }, (_, col) => (
+                          <td key={`${row}-${col}`} className="game-cell target-cell">
+                            {renderTargetBoard(1)(row, col)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </div>
-                  <GameBoard
-                    rows={BOARD_SIZE}
-                    cols={BOARD_SIZE}
-                    renderCell={renderTargetBoard(1)}
-                    className="target-board small"
-                  />
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -177,50 +233,56 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
             <div className="board-container">
               <h4>Attack Grid</h4>
               <div className="board-with-labels">
-                <div className="column-labels">
-                  <div className="empty-cell"></div>
-                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                    <div key={i} className="label">{getColumnLabel(i)}</div>
-                  ))}
-                </div>
-                <div className="board-row-container">
-                  <div className="row-labels">
-                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                      <div key={i} className="label">{i + 1}</div>
+                <table className="battleship-table">
+                  <thead>
+                    <tr>
+                      <th className="corner-cell"></th>
+                      {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                        <th key={i} className="col-label">{getColumnLabel(i)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: BOARD_SIZE }, (_, row) => (
+                      <tr key={row}>
+                        <td className="row-label">{row + 1}</td>
+                        {Array.from({ length: BOARD_SIZE }, (_, col) => (
+                          <td key={`${row}-${col}`} className="game-cell target-cell">
+                            {renderTargetBoard(2)(row, col)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </div>
-                  <GameBoard
-                    rows={BOARD_SIZE}
-                    cols={BOARD_SIZE}
-                    renderCell={renderTargetBoard(2)}
-                    className="target-board small"
-                  />
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
             
             <div className="board-container">
               <h4>Defense Grid</h4>
               <div className="board-with-labels">
-                <div className="column-labels">
-                  <div className="empty-cell"></div>
-                  {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                    <div key={i} className="label">{getColumnLabel(i)}</div>
-                  ))}
-                </div>
-                <div className="board-row-container">
-                  <div className="row-labels">
-                    {Array.from({ length: BOARD_SIZE }, (_, i) => (
-                      <div key={i} className="label">{i + 1}</div>
+                <table className="battleship-table">
+                  <thead>
+                    <tr>
+                      <th className="corner-cell"></th>
+                      {Array.from({ length: BOARD_SIZE }, (_, i) => (
+                        <th key={i} className="col-label">{getColumnLabel(i)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: BOARD_SIZE }, (_, row) => (
+                      <tr key={row}>
+                        <td className="row-label">{row + 1}</td>
+                        {Array.from({ length: BOARD_SIZE }, (_, col) => (
+                          <td key={`${row}-${col}`} className="game-cell own-cell">
+                            {renderOwnBoard(2)(row, col)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </div>
-                  <GameBoard
-                    rows={BOARD_SIZE}
-                    cols={BOARD_SIZE}
-                    renderCell={renderOwnBoard(2)}
-                    className="own-board small"
-                  />
-                </div>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

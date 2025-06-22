@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import Battleship from './components/games/Battleship/Battleship'
 
-const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
+const MODELS = ['gemini', 'anthropic', 'openai', 'groq', 'custom']
 const GAMES = [
   { name: 'Wordle', emoji: '📝', description: 'Word guessing' },
   { name: 'Trivia', emoji: '🧠', description: 'Test your knowledge' },
@@ -26,7 +26,7 @@ function App() {
     setGameStarted(true)
   }
 
-  const handleBack = () => {
+  const handleBackToMenu = () => {
     setSelectedGame(null)
     setPlayer1Model('')
     setPlayer2Model('')
@@ -39,9 +39,25 @@ function App() {
     if (selectedGame.name === 'Battleship') {
       return (
         <div className="app">
-          <button className="back-button" onClick={handleBack}>
-            ← Back to Menu
-          </button>
+          <button 
+              onClick={handleBackToMenu}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                zIndex: 1000,
+                background: 'rgba(0, 0, 0, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                margin: 0
+              }}
+            >
+              ← Back to Menu
+            </button>
           <Battleship 
             player1Model={player1Model} 
             player2Model={player2Model}
@@ -52,9 +68,25 @@ function App() {
     } else {
       return (
         <div className="app">
-          <button className="back-button" onClick={handleBack}>
-            ← Back
-          </button>
+          <button 
+              onClick={handleBackToMenu}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                zIndex: 1000,
+                background: 'rgba(0, 0, 0, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                margin: 0
+              }}
+            >
+              ← Back to Menu
+            </button>
           <div className="game-not-implemented">
             <h2>{selectedGame.name} - Coming Soon!</h2>
             <p>This game is not yet implemented.</p>
@@ -91,9 +123,25 @@ function App() {
 
   return (
     <div className="app">
-      <button className="back-button" onClick={handleBack}>
-        ← Back
-      </button>
+      <button 
+          onClick={handleBackToMenu}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            color: '#fff',
+            padding: '0.5rem 1rem',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            margin: 0
+          }}
+        >
+          ← Back to Menu
+        </button>
       
       <div className="game-setup">
         <div className="selected-game-header">
@@ -111,7 +159,7 @@ function App() {
             >
               <option value="">Select LLM...</option>
               {MODELS.map((model) => (
-                <option key={model} value={model}>{model}</option>
+                <option key={model} value={model}>{model.toUpperCase()}</option>
               ))}
             </select>
           </div>
@@ -127,7 +175,7 @@ function App() {
             >
               <option value="">Select LLM...</option>
               {MODELS.map((model) => (
-                <option key={model} value={model}>{model}</option>
+                <option key={model} value={model}>{model.toUpperCase()}</option>
               ))}
             </select>
           </div>
