@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import './App.css'
 
 const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
@@ -7,20 +8,31 @@ const GAMES = [
   { name: 'Trivia', emoji: '🧠', description: 'Test your knowledge' },
   { name: 'NYT Connections', emoji: '🔗', description: 'Find the connections' },
   { name: 'Battleship', emoji: '🚢', description: 'Naval strategy' },
-  { name: 'Connect 4', emoji: '🔴', description: 'Four in a row' }
+  { name: 'Connect 4', emoji: '🔴', description: 'Four in a row' },
+  { name: 'Debate', emoji: '🎭', description: 'AI argument showdown' }
 ]
 
-function App() {
+function MainMenu() {
+  const navigate = useNavigate()
   const [selectedGame, setSelectedGame] = useState(null)
   const [player1Model, setPlayer1Model] = useState('')
   const [player2Model, setPlayer2Model] = useState('')
 
   const handleStartMatch = () => {
-    console.log('Starting match:', {
-      game: selectedGame.name,
-      player1: player1Model,
-      player2: player2Model
-    })
+    if (selectedGame.name === 'Debate') {
+      navigate('/debate', { 
+        state: { 
+          player1Model, 
+          player2Model 
+        } 
+      })
+    } else {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+    }
   }
 
   const handleBack = () => {
@@ -107,6 +119,28 @@ function App() {
         </button>
       </div>
     </div>
+  )
+}
+
+// Placeholder Debate component
+function DebateGame() {
+  return (
+    <div className="app">
+      <h1>🎭 Debate Game</h1>
+      <p>Debate game implementation coming soon...</p>
+      <button onClick={() => window.history.back()}>← Back</button>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/debate" element={<DebateGame />} />
+      </Routes>
+    </Router>
   )
 }
 

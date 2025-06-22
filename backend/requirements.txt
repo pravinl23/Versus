@@ -4,11 +4,11 @@ uvicorn[standard]==0.24.0
 python-dotenv==1.0.0
 websockets==12.0
 
-# LLM API clients
-openai==1.3.0
-anthropic==0.7.0
+# LLM API clients (updated versions for Python 3.12 compatibility)
+openai==1.35.7
+anthropic==0.29.0
 google-generativeai==0.3.0
-groq==0.3.0
+groq==0.9.0
 transformers==4.35.0
 
 # Utilities
@@ -16,5 +16,8 @@ pydantic==2.5.0
 httpx==0.25.0
 python-multipart==0.0.6
 
-# Game-specific (optional)
-numpy==1.24.3 
+# Python 3.12 compatibility
+setuptools>=65.5.1
+
+# Game-specific and general utilities
+numpy==1.26.4 
