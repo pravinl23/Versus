@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import WordleGame from './components/games/WordleGame'
 
 const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
 const GAMES = [
@@ -14,6 +15,7 @@ function App() {
   const [selectedGame, setSelectedGame] = useState(null)
   const [player1Model, setPlayer1Model] = useState('')
   const [player2Model, setPlayer2Model] = useState('')
+  const [gameStarted, setGameStarted] = useState(false)
 
   const handleStartMatch = () => {
     console.log('Starting match:', {
@@ -21,12 +23,25 @@ function App() {
       player1: player1Model,
       player2: player2Model
     })
+    setGameStarted(true)
   }
 
   const handleBack = () => {
     setSelectedGame(null)
     setPlayer1Model('')
     setPlayer2Model('')
+    setGameStarted(false)
+  }
+
+  // If game is started and it's Wordle
+  if (gameStarted && selectedGame?.name === 'Wordle') {
+    return (
+      <WordleGame 
+        player1Model={player1Model}
+        player2Model={player2Model}
+        onBack={handleBack}
+      />
+    )
   }
 
   if (!selectedGame) {
@@ -100,10 +115,12 @@ function App() {
 
         <button 
           className="start-button" 
-          disabled={!player1Model || !player2Model}
+          disabled={!player1Model || !player2Model || (selectedGame.name === 'Wordle' && (!['OPENAI', 'ANTHROPIC'].includes(player1Model) || !['OPENAI', 'ANTHROPIC'].includes(player2Model)))}
           onClick={handleStartMatch}
         >
-          START GAME
+          {selectedGame.name === 'Wordle' && (!['OPENAI', 'ANTHROPIC'].includes(player1Model) || !['OPENAI', 'ANTHROPIC'].includes(player2Model)) 
+            ? 'Wordle only supports OpenAI and Anthropic'
+            : 'START GAME'}
         </button>
       </div>
     </div>
