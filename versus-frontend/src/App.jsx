@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import './App.css'
+import TriviaGame from './components/TriviaGame'
 import WordleGame from './components/games/WordleGame'
 
 const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
@@ -11,19 +13,29 @@ const GAMES = [
   { name: 'Connect 4', emoji: '🔴', description: 'Four in a row' }
 ]
 
-function App() {
+function MainMenu() {
+  const navigate = useNavigate()
   const [selectedGame, setSelectedGame] = useState(null)
   const [player1Model, setPlayer1Model] = useState('')
   const [player2Model, setPlayer2Model] = useState('')
   const [gameStarted, setGameStarted] = useState(false)
 
   const handleStartMatch = () => {
-    console.log('Starting match:', {
-      game: selectedGame.name,
-      player1: player1Model,
-      player2: player2Model
-    })
-    setGameStarted(true)
+
+    if (selectedGame.name === 'Trivia') {
+      navigate('/trivia', { 
+        state: { 
+          player1Model, 
+          player2Model 
+        } 
+      })
+    } else {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+    }
   }
 
   const handleBack = () => {
@@ -124,6 +136,17 @@ function App() {
         </button>
       </div>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/trivia" element={<TriviaGame />} />
+      </Routes>
+    </Router>
   )
 }
 

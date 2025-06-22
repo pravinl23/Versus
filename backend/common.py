@@ -19,27 +19,26 @@ class LLMClient:
     
     def _initialize_client(self):
         if self.model_type == "OPENAI":
-            import openai
-            openai.api_key = os.getenv("OPENAI_API_KEY")
-            return openai
+            from openai import AsyncOpenAI
+            return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.model_type == "ANTHROPIC":
-            from anthropic import Anthropic
-            return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            from anthropic import AsyncAnthropic
+            return AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         elif self.model_type == "GEMINI":
             import google.generativeai as genai
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
             return genai
         elif self.model_type == "GROQ":
-            from groq import Groq
-            return Groq(api_key=os.getenv("GROQ_API_KEY"))
+            from groq import AsyncGroq
+            return AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
     
     async def get_move(self, prompt: str) -> str:
         """Get a move from the LLM"""
-        # Implementation varies by model
-        # This is a placeholder - implement based on model type
-        pass
+        # This method is implemented in the individual game classes
+        # Each game handles LLM queries differently
+        raise NotImplementedError("Implement in individual game classes")
 
 
 class BaseGame(ABC):
