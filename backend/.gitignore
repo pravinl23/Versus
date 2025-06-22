@@ -1,6 +1,6 @@
 # Environment variables
-.env
-.env.local
+#.env
+#.env.local
 
 # Python
 __pycache__/
@@ -12,6 +12,7 @@ venv/
 env/
 ENV/
 .venv
+RT/
 
 # IDE
 .vscode/
