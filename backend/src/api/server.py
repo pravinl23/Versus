@@ -100,13 +100,26 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
             data = await websocket.receive_json()
             
             if data.get("type") == "start_game":
-                # Use default models if not provided
-                models = get_models_for_game("battleship", 
-                                           data.get("player1Model"), 
-                                           data.get("player2Model"))
-                player1_model = models["player1"]
-                player2_model = models["player2"]
+                # Map model IDs to backend format (same function as trivia uses)
+                def map_model_to_backend(model_id):
+                    if not model_id:
+                        return "openai"  # default fallback
+                    model_id = model_id.lower()
+                    if "gpt" in model_id or "openai" in model_id:
+                        return "openai"
+                    elif "claude" in model_id or "anthropic" in model_id:
+                        return "anthropic"
+                    elif "gemini" in model_id or "google" in model_id:
+                        return "gemini"
+                    elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
+                        return "groq"
+                    else:
+                        return "openai"  # default fallback
                 
+                player1_model = map_model_to_backend(data.get("player1Model"))
+                player2_model = map_model_to_backend(data.get("player2Model"))
+                
+                print(f"Received models: {data.get('player1Model')} -> {player1_model}, {data.get('player2Model')} -> {player2_model}")
                 print(f"Starting battleship game with models: {player1_model} vs {player2_model}")
                 
                 # Create and run the battleship game

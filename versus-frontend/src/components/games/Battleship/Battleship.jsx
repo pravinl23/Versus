@@ -21,19 +21,54 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   // WebSocket connection
   const { gameState, isConnected, sendMessage } = useGameWebSocket('battleship', gameId);
 
+  // Convert model IDs to the backend format
+  const getBackendModelName = (modelId) => {
+    if (!modelId) return 'openai'; // fallback
+    const modelStr = modelId.toString().toLowerCase();
+    if (modelStr.includes('gpt') || modelStr.includes('openai')) return 'openai';
+    if (modelStr.includes('claude') || modelStr.includes('anthropic')) return 'anthropic';
+    if (modelStr.includes('gemini') || modelStr.includes('google')) return 'gemini';
+    if (modelStr.includes('groq') || modelStr.includes('mixtral') || modelStr.includes('llama')) return 'groq';
+    return 'openai'; // fallback
+  };
+
+  const backendPlayer1 = getBackendModelName(player1Model);
+  const backendPlayer2 = getBackendModelName(player2Model);
+
+  // Get display names for models
+  const getDisplayName = (modelId) => {
+    if (!modelId) return 'Unknown';
+    const modelStr = modelId.toString();
+    if (modelStr.includes('gpt-4o-mini')) return 'GPT-4o Mini';
+    if (modelStr.includes('gpt-4o')) return 'GPT-4o';
+    if (modelStr.includes('gpt-4-turbo')) return 'GPT-4 Turbo';
+    if (modelStr.includes('gpt-3.5')) return 'GPT-3.5';
+    if (modelStr.includes('claude-3-opus')) return 'Claude 3 Opus';
+    if (modelStr.includes('claude-3-sonnet')) return 'Claude 3 Sonnet';
+    if (modelStr.includes('claude-3-haiku')) return 'Claude 3 Haiku';
+    if (modelStr.includes('gemini-pro')) return 'Gemini Pro';
+    if (modelStr.includes('gemini')) return 'Gemini';
+    if (modelStr.includes('mixtral')) return 'Mixtral';
+    if (modelStr.includes('llama')) return 'Llama';
+    return modelStr.charAt(0).toUpperCase() + modelStr.slice(1);
+  };
+
+  const player1DisplayName = getDisplayName(player1Model);
+  const player2DisplayName = getDisplayName(player2Model);
+
   // Start game automatically when connected
   useEffect(() => {
     if (isConnected && gameStatus === GAME_STATUS.WAITING) {
       // Both AIs place ships automatically
       sendMessage({
         type: 'start_game',
-        player1Model,
-        player2Model,
+        player1Model: backendPlayer1,
+        player2Model: backendPlayer2,
         autoPlaceShips: true
       });
       setGameStatus(GAME_STATUS.IN_PROGRESS);
     }
-  }, [isConnected, gameStatus, player1Model, player2Model, sendMessage]);
+  }, [isConnected, gameStatus, backendPlayer1, backendPlayer2, sendMessage]);
 
   // Handle game state updates from WebSocket
   useEffect(() => {
@@ -149,7 +184,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
         {/* Player 1 Side */}
         <div className={`player-side player-1-side ${currentPlayer === 1 ? 'active' : ''}`}>
           <div className="player-header">
-            <h3>{player1Model}</h3>
+            <h3>{player1DisplayName}</h3>
             <span className="player-label">Player 1</span>
           </div>
           
@@ -217,7 +252,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
           <div className="vs-indicator">VS</div>
           {winner && (
             <div className="winner-announcement">
-              {winner === 1 ? player1Model : player2Model} Wins!
+              {winner === 1 ? player1DisplayName : player2DisplayName} Wins!
             </div>
           )}
         </div>
@@ -225,7 +260,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
         {/* Player 2 Side */}
         <div className={`player-side player-2-side ${currentPlayer === 2 ? 'active' : ''}`}>
           <div className="player-header">
-            <h3>{player2Model}</h3>
+            <h3>{player2DisplayName}</h3>
             <span className="player-label">Player 2</span>
           </div>
           
