@@ -20,6 +20,8 @@ const TriviaGame = () => {
       return
     }
 
+    console.log('🎮 Starting trivia with models:', { player1Model, player2Model })
+    
     // Start a new game
     startNewGame()
   }, [player1Model, player2Model, navigate])
@@ -27,6 +29,8 @@ const TriviaGame = () => {
   const startNewGame = async () => {
     setIsLoading(true)
     setError(null)
+
+    console.log('📡 Sending trivia start request with models:', { player1Model, player2Model })
 
     try {
       const response = await fetch('http://localhost:8000/api/trivia/start', {
@@ -47,10 +51,11 @@ const TriviaGame = () => {
       }
 
       const data = await response.json()
+      console.log('✅ Trivia game started:', data)
       setGameId(data.game_id)
       setGameStarted(true)
     } catch (err) {
-      console.error('Error starting game:', err)
+      console.error('❌ Error starting trivia game:', err)
       setError(err.message)
     } finally {
       setIsLoading(false)

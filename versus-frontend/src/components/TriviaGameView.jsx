@@ -1,14 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './TriviaGameView.css'
 
-const MODELS_INFO = {
-  'OPENAI': { name: 'GPT-4', color: '#10a37f', emoji: '🤖' },
-  'ANTHROPIC': { name: 'Claude 3', color: '#d97706', emoji: '🧠' },
-  'GEMINI': { name: 'Gemini Pro', color: '#4285f4', emoji: '✨' },
-  'GROQ': { name: 'Mixtral', color: '#f59e0b', emoji: '⚡' }
-}
-
 const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
+  // Get display names and info for models
+  const getModelInfo = (modelId) => {
+    if (!modelId) return { name: 'Unknown', color: '#6b7280', emoji: '🤖' }
+    
+    const id = modelId.toLowerCase()
+    
+    // OpenAI models
+    if (id.includes('gpt-4o')) return { name: 'GPT-4o', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt-4-turbo')) return { name: 'GPT-4 Turbo', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt-3.5')) return { name: 'GPT-3.5', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt') || id.includes('openai')) return { name: 'GPT-4', color: '#10a37f', emoji: '🤖' }
+    
+    // Anthropic models
+    if (id.includes('claude-3-opus')) return { name: 'Claude 3 Opus', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude-3-sonnet')) return { name: 'Claude 3 Sonnet', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude-3-haiku')) return { name: 'Claude 3 Haiku', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude') || id.includes('anthropic')) return { name: 'Claude 3', color: '#d97706', emoji: '🧠' }
+    
+    // Google models
+    if (id.includes('gemini-1.5-pro')) return { name: 'Gemini 1.5 Pro', color: '#4285f4', emoji: '✨' }
+    if (id.includes('gemini-1.5-flash')) return { name: 'Gemini 1.5 Flash', color: '#4285f4', emoji: '✨' }
+    if (id.includes('gemini')) return { name: 'Gemini Pro', color: '#4285f4', emoji: '✨' }
+    
+    // Groq/Other models
+    if (id.includes('llama')) return { name: 'Llama 3', color: '#f59e0b', emoji: '🦙' }
+    if (id.includes('mixtral')) return { name: 'Mixtral', color: '#f59e0b', emoji: '⚡' }
+    if (id.includes('groq')) return { name: 'Groq', color: '#f59e0b', emoji: '⚡' }
+    
+    // Fallback - capitalize the model name
+    return { 
+      name: modelId.charAt(0).toUpperCase() + modelId.slice(1), 
+      color: '#6b7280', 
+      emoji: '🤖' 
+    }
+  }
+
+  const player1Info = getModelInfo(player1Model)
+  const player2Info = getModelInfo(player2Model)
+
   // Race state for each player
   const [player1State, setPlayer1State] = useState({
     questionIndex: 0,
@@ -175,13 +207,6 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     askNextQuestion(1)
     askNextQuestion(2)
   }
-
-  const getModelInfo = (modelType) => {
-    return MODELS_INFO[modelType] || { name: modelType, color: '#6b7280', emoji: '🤖' }
-  }
-
-  const player1Info = getModelInfo(player1Model)
-  const player2Info = getModelInfo(player2Model)
 
   if (!raceState.raceStarted) {
     return (

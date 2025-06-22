@@ -25,13 +25,15 @@ body {
 
 .app {
   min-height: 100vh;
-  background: #000;
+  background: linear-gradient(135deg, #000 0%, #1a1a2e 25%, #16213e  50%, #0f3460 75%, #000 100%);
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow-x: hidden;
 }
 
 @keyframes fadeIn {
@@ -41,33 +43,51 @@ body {
 
 /* Main page styles */
 .main-header {
-  text-align: center;
   margin-bottom: 3rem;
 }
 
 .title {
-  font-size: 5rem;
+  font-size: 4rem;
   font-weight: 900;
-  letter-spacing: 0.1em;
-  background: linear-gradient(45deg, #fff, #888);
+  margin-bottom: 0.5rem;
+  background: linear-gradient(45deg, #fff, #00d4ff, #ff6b6b);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
+  text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
 }
 
 .subtitle {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   color: #888;
-  font-weight: 300;
+  margin-bottom: 1rem;
+}
+
+.selected-models-display {
+  font-size: 1.3rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  margin-top: 1rem;
+  display: inline-block;
+}
+
+.selected-models-display .model-name {
+  color: #00d4ff;
+  font-weight: 800;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
 }
 
 /* Game grid */
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 1.5rem;
   margin-top: 3rem;
+  max-width: 1400px;
+  width: 100%;
 }
 
 .game-card {
@@ -143,6 +163,33 @@ body {
 }
 
 /* Model selection */
+.ai-battle-info {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ai-battle-info .vs-text {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.model-name {
+  color: #00d4ff;
+  font-weight: 800;
+}
+
+.battle-description {
+  color: #aaa;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
 .model-selection {
   display: flex;
   align-items: center;
@@ -192,12 +239,6 @@ body {
   color: #fff;
 }
 
-.vs-text {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #666;
-}
-
 /* Start button */
 .start-button {
   background: linear-gradient(135deg, #fff, #ccc);
@@ -243,22 +284,21 @@ body {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .title {
-    font-size: 3rem;
-  }
-  
+@media (max-width: 1200px) {
   .games-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .games-grid {
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
-  
-  .model-selection {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  
-  .vs-text {
-    font-size: 1.5rem;
+}
+
+@media (max-width: 480px) {
+  .games-grid {
+    grid-template-columns: 1fr;
   }
 }
