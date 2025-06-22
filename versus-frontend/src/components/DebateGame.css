@@ -347,6 +347,12 @@
   50% { transform: scale(1.5); opacity: 0.7; }
 }
 
+.voice-status {
+  font-size: 0.9rem;
+  color: #FFD700;
+  font-style: italic;
+}
+
 /* Judgment Section */
 .judgment-section {
   position: absolute;

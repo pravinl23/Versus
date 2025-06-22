@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SidebarVote from './SidebarVote';
 import GameTimer from './common/GameTimer';
+import Vapi from '@vapi-ai/web';
 import './DebateGame.css';
 
 const JUDGE_MODEL = 'gpt-4o'; // Hardcoded judge model
@@ -16,6 +17,11 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
   const [message, setMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
+  
+  // Vapi-related state
+  const [vapiInstance, setVapiInstance] = useState(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentlyTyping, setCurrentlyTyping] = useState(null);
 
   // Get display names for models
   const getDisplayName = (modelId) => {
@@ -110,6 +116,172 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
     }
   };
 
+  // Typewriter effect - shows words as they're spoken
+  const startTypewriterEffect = (fullText, position) => {
+    const words = fullText.split(' ');
+    const speechRate = 1.0;
+    const avgWPM = 150 * speechRate;
+    const msPerWord = (60 / avgWPM) * 1000;
+    
+    setCurrentlyTyping({ text: '', position, fullText });
+    
+    let wordIndex = 0;
+    const typeInterval = setInterval(() => {
+      if (wordIndex < words.length) {
+        const displayText = words.slice(0, wordIndex + 1).join(' ');
+        setCurrentlyTyping({ text: displayText, position, fullText });
+        wordIndex++;
+      } else {
+        clearInterval(typeInterval);
+        setCurrentlyTyping(null);
+      }
+    }, msPerWord);
+    
+    return () => clearInterval(typeInterval);
+  };
+
+  // Speak argument using Vapi
+  const speakArgument = async (text, position) => {
+    console.log(`🎤 Speaking ${position} argument:`, text);
+    
+    // Use Vapi if available
+    if (vapiInstance) {
+      try {
+        // Stop any existing call
+        try {
+          vapiInstance.stop();
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (e) {
+          // Ignore if no active call
+        }
+
+        // Vapi configuration
+        const assistant = {
+          voice: {
+            provider: "11labs",
+            voiceId: position === "PRO" ? "pNInz6obpgDQGcFmaJgB" : "21m00Tcm4TlvDq8ikWAM",
+            speed: 1.0,
+            stability: 0.7,
+            similarityBoost: 0.8,
+            style: 0.2,
+            useSpeakerBoost: true
+          },
+          firstMessage: text
+        };
+
+        console.log(`🎭 ${position} using Vapi voice: ${position === "PRO" ? "Elliot" : "Rachel"}`);
+
+        let cleanupTypewriter = null;
+        let speechPromiseResolver = null;
+
+        const speechPromise = new Promise((resolve) => {
+          speechPromiseResolver = resolve;
+        });
+
+        const handleSpeechStart = () => {
+          console.log('🗣️ Vapi started speaking');
+          setIsSpeaking(true);
+          cleanupTypewriter = startTypewriterEffect(text, position);
+        };
+
+        const handleSpeechEnd = () => {
+          console.log('🗣️ Vapi finished speaking');
+          setIsSpeaking(false);
+          if (cleanupTypewriter) cleanupTypewriter();
+          setCurrentlyTyping(null);
+          vapiInstance.off('speech-start', handleSpeechStart);
+          vapiInstance.off('speech-end', handleSpeechEnd);
+          vapiInstance.off('call-end', handleSpeechEnd);
+          if (speechPromiseResolver) speechPromiseResolver();
+        };
+
+        vapiInstance.on('speech-start', handleSpeechStart);
+        vapiInstance.on('speech-end', handleSpeechEnd);
+        vapiInstance.on('call-end', handleSpeechEnd);
+
+        await vapiInstance.start(assistant);
+        await speechPromise;
+        
+        return Promise.resolve();
+        
+      } catch (error) {
+        console.error('❌ Vapi TTS failed:', error);
+        setIsSpeaking(false);
+        setCurrentlyTyping(null);
+      }
+    }
+    
+    // Fallback: Use Web Speech API
+    if ('speechSynthesis' in window) {
+      try {
+        console.log('🔄 Using Web Speech API');
+        
+        window.speechSynthesis.cancel();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        
+        const voices = window.speechSynthesis.getVoices();
+        
+        if (position === "PRO") {
+          const maleVoice = voices.find(voice => 
+            voice.name.toLowerCase().includes('male') ||
+            voice.name.toLowerCase().includes('david') ||
+            voice.name.toLowerCase().includes('daniel')
+          );
+          if (maleVoice) utterance.voice = maleVoice;
+          utterance.pitch = 0.9;
+        } else {
+          const femaleVoice = voices.find(voice => 
+            voice.name.toLowerCase().includes('female') ||
+            voice.name.toLowerCase().includes('samantha') ||
+            voice.name.toLowerCase().includes('victoria')
+          );
+          if (femaleVoice) utterance.voice = femaleVoice;
+          utterance.pitch = 1.1;
+        }
+        
+        return new Promise((resolve) => {
+          let cleanupTypewriter = null;
+          
+          utterance.onstart = () => {
+            setIsSpeaking(true);
+            cleanupTypewriter = startTypewriterEffect(text, position);
+          };
+          
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            if (cleanupTypewriter) cleanupTypewriter();
+            setCurrentlyTyping(null);
+            resolve();
+          };
+          
+          utterance.onerror = (e) => {
+            console.error('❌ Web Speech error:', e);
+            setIsSpeaking(false);
+            if (cleanupTypewriter) cleanupTypewriter();
+            setCurrentlyTyping(null);
+            resolve();
+          };
+          
+          if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.addEventListener('voiceschanged', () => {
+              window.speechSynthesis.speak(utterance);
+            }, { once: true });
+          } else {
+            window.speechSynthesis.speak(utterance);
+          }
+        });
+        
+      } catch (error) {
+        console.error('❌ Web Speech API also failed:', error);
+      }
+    }
+    
+    return Promise.resolve();
+  };
+
   const handleGameStateUpdate = (data) => {
     console.log('Debate state update:', data.type);
     
@@ -120,10 +292,10 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
       setCurrentSpeaker(data.argument.position);
       setMessage(`${data.argument.position} is speaking...`);
       
-      // Clear speaker after a delay
-      setTimeout(() => {
+      // Speak the argument
+      speakArgument(data.argument.argument, data.argument.position).then(() => {
         setCurrentSpeaker(null);
-      }, 3000);
+      });
     } else if (data.type === 'debate_finished') {
       setMessage('Debate finished! Judge is evaluating...');
     } else if (data.type === 'judgment_complete') {
@@ -143,6 +315,37 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
         wsRef.current = null;
       }
     };
+  }, []);
+
+  // Initialize Vapi
+  useEffect(() => {
+    const vapiKey = import.meta.env.VITE_VAPI_API_KEY;
+    if (vapiKey) {
+      try {
+        const vapi = new Vapi(vapiKey);
+        setVapiInstance(vapi);
+        
+        // Listen to Vapi events
+        vapi.on('call-start', () => {
+          console.log('🎤 Voice call started');
+          setIsSpeaking(true);
+        });
+        vapi.on('call-end', () => {
+          console.log('🎤 Voice call ended');
+          setIsSpeaking(false);
+        });
+        vapi.on('speech-start', () => {
+          console.log('🗣️ AI started speaking');
+        });
+        vapi.on('speech-end', () => {
+          console.log('🗣️ AI finished speaking');
+        });
+      } catch (error) {
+        console.warn('Failed to initialize Vapi:', error);
+      }
+    } else {
+      console.log('🔇 Vapi disabled - no VITE_VAPI_API_KEY found');
+    }
   }, []);
 
   return (
@@ -209,7 +412,12 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
                   .map((arg, index) => (
                     <div key={`pro-${index}`} className="argument-card">
                       <div className="argument-round">Round {arg.round}</div>
-                      <div className="argument-text">{arg.argument}</div>
+                      <div className="argument-text">
+                        {currentlyTyping && currentlyTyping.position === 'PRO' && 
+                         debateArgs.filter(a => a.position === 'PRO').length - 1 === index
+                          ? currentlyTyping.text
+                          : arg.argument}
+                      </div>
                     </div>
                   ))}
               </div>
@@ -218,10 +426,11 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
             {/* Center Divider */}
             <div className="debate-divider">
               <div className="vs-text">VS</div>
-              {currentSpeaker && (
+              {(currentSpeaker || isSpeaking) && (
                 <div className="speaking-indicator">
                   <div className="speaking-dot"></div>
                   <span>{currentSpeaker} Speaking</span>
+                  {isSpeaking && <span className="voice-status"> (Voice Active)</span>}
                 </div>
               )}
             </div>
@@ -239,7 +448,12 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
                   .map((arg, index) => (
                     <div key={`con-${index}`} className="argument-card">
                       <div className="argument-round">Round {arg.round}</div>
-                      <div className="argument-text">{arg.argument}</div>
+                      <div className="argument-text">
+                        {currentlyTyping && currentlyTyping.position === 'CON' && 
+                         debateArgs.filter(a => a.position === 'CON').length - 1 === index
+                          ? currentlyTyping.text
+                          : arg.argument}
+                      </div>
                     </div>
                   ))}
               </div>
