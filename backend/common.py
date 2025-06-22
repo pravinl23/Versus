@@ -80,7 +80,14 @@ class LLMClient:
                 import google.generativeai as genai
                 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
                 model = genai.GenerativeModel('gemini-pro')
-                response = await model.generate_content_async(prompt)
+                
+                # Configure generation for longer responses
+                generation_config = genai.types.GenerationConfig(
+                    max_output_tokens=1500,
+                    temperature=0.7,
+                )
+                
+                response = await model.generate_content_async(prompt, generation_config=generation_config)
                 return response.text.strip()
             
             elif self.model_type == "GROQ":
