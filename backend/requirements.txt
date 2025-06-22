@@ -28,5 +28,8 @@ python-multipart==0.0.6
 # Game-specific and general utilities
 numpy==2.0.0
 
+# NEW: Letta Integration
+letta-client==0.8.0
+
 # Voice synthesis (optional)
 # elevenlabs==0.2.26  # Optional: for direct ElevenLabs integration

@@ -98,6 +98,38 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
           handlePlayerQuestionResult(message.data)
         } else if (message.type === 'race_finished') {
           handleRaceFinished(message.data)
+        } else if (message.type === 'post_game_interviews') {
+          console.log('🔥 Received post-game roast data:', message.interviews)
+          
+          // Auto-play winner roast audio without modal
+          if (message.interviews.winner && message.interviews.winner.audio_url) {
+            console.log('🎵 Auto-playing trivia winner roast audio...')
+            
+            setTimeout(() => {
+              const audio = new Audio(message.interviews.winner.audio_url)
+              
+              audio.onplay = () => {
+                console.log('▶️ 🔥 TRIVIA ROAST PLAYING:', message.interviews.winner.personality)
+                console.log('💬 Roast:', message.interviews.winner.response || message.interviews.winner.text)
+              }
+              
+              audio.onended = () => {
+                console.log('✅ Trivia roast completed - savage!')
+              }
+              
+              audio.onerror = (e) => {
+                console.error('❌ Failed to play roast audio:', e)
+              }
+              
+              // Auto-play the roast
+              audio.play().catch(error => {
+                console.error('❌ Audio autoplay failed (might need user interaction):', error)
+              })
+              
+            }, 2000) // Delay after race ends
+          } else if (message.interviews.winner) {
+            console.log('📝 Roast generated but no audio - text only:', message.interviews.winner.response)
+          }
         } else if (message.type === 'error') {
           console.error('Game error:', message.message)
         }
@@ -320,6 +352,8 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
             NEW RACE
           </button>
         </div>
+
+        {/* Audio auto-plays when roast is generated */}
       </div>
     )
   }
@@ -476,6 +510,8 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
           </div>
         </div>
       </div>
+
+      {/* Audio auto-plays when roast is generated */}
     </div>
   )
 }

@@ -398,7 +398,7 @@
 
 .wordle-tile.thinking {
   border-color: #666;
-  animation: pulse 1.5s infinite;
+  /* Removed animation to stop moving rectangle */
 }
 
 /* VS Divider */

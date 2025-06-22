@@ -5,11 +5,27 @@ Common utilities and base classes for all games
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Tuple
+from enum import Enum
 from dotenv import load_dotenv
 import asyncio
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from backend/.env
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # Go up 3 levels from src/utils/common.py
+env_path = os.path.join(backend_dir, '.env')
+load_dotenv(env_path)
+
+class GameStatus(Enum):
+    """Game status enumeration"""
+    WAITING = "waiting"
+    IN_PROGRESS = "in_progress"
+    FINISHED = "finished"
+    ERROR = "error"
+
+class PlayerAction:
+    """Player action class for debate games"""
+    def __init__(self, action_type: str, data: Dict[str, Any] = None):
+        self.action_type = action_type
+        self.data = data or {}
 
 class LLMClient:
     """Wrapper for different LLM API clients"""

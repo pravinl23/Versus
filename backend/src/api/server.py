@@ -16,6 +16,10 @@ import sys
 import os
 from datetime import datetime
 import re
+import time
+
+# Import Letta service
+from src.services.letta_service import letta_service  # Updated with fallback
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -58,6 +62,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Letta personalities on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Letta personalities when server starts"""
+    print("🚀 Starting VERSUS server with Letta personalities...")
+    
+    # Create static directories if they don't exist
+    os.makedirs("static/interviews", exist_ok=True)
+    print("📁 Static directories initialized")
+    
+    try:
+        print("🎭 Initializing Letta personalities...")
+        await letta_service.initialize_personalities()
+        
+        if letta_service.initialized:
+            print("✅ AI personalities ready for competition!")
+        else:
+            print("❌ Letta personalities failed to initialize")
+            print(f"   - Client created: {bool(letta_service.letta_client)}")
+            print(f"   - Initialized: {letta_service.initialized}")
+            
+    except Exception as e:
+        print(f"❌ Error initializing Letta personalities: {e}")
+        import traceback
+        traceback.print_exc()
+
 # Store active games
 active_games = {}
 battleship_games = {}  # Add this to store battleship games
@@ -92,6 +122,152 @@ class ConnectionManager:
                     pass  # Connection might be closed
 
 manager = ConnectionManager()
+
+# ====================
+# LETTA INTEGRATION
+# ====================
+
+async def handle_game_completion(game_type: str, winner: int, player1_model: str, player2_model: str, 
+                               game_data: dict, game_id: str):
+    """Enhanced game completion with Letta personality updates and interviews"""
+    try:
+        winner_model = player1_model if winner == 1 else player2_model
+        loser_model = player2_model if winner == 1 else player1_model
+        
+        print(f"🎭 GAME COMPLETION DEBUG:")
+        print(f"   Game Type: {game_type}")
+        print(f"   Winner: Player {winner} ({winner_model})")
+        print(f"   Loser: Player {3-winner} ({loser_model})")
+        print(f"   Game ID: {game_id}")
+        print(f"   Game Data: {game_data}")
+        
+        # Update Letta personalities with match results
+        print(f"🧠 Updating Letta memories for future roasts...")
+        await letta_service.update_match_memories(
+            game_type=game_type,
+            winner_model=winner_model,
+            loser_model=loser_model,
+            game_data=game_data
+        )
+        
+        # Generate post-game trash talk
+        print(f"🔥 Generating savage roast...")
+        interviews = await letta_service.generate_post_game_interviews(
+            player1_model, player2_model, winner, game_type, game_data
+        )
+        
+        if interviews:
+            print(f"✅ ROAST generated! Keys: {list(interviews.keys())}")
+            # Convert to voice and broadcast
+            await broadcast_post_game_interviews(interviews, game_id)
+        else:
+            print(f"❌ No roast generated!")
+        
+    except Exception as e:
+        print(f"❌ Error handling game completion: {e}")
+        import traceback
+        traceback.print_exc()
+
+async def broadcast_post_game_interviews(interviews: dict, game_id: str):
+    """Convert trash talk to voice and broadcast to clients"""
+    try:
+        print(f"🔥 ROAST BROADCAST: Starting trash talk for game {game_id}")
+        print(f"   Roast roles: {list(interviews.keys())}")
+        
+        interview_audio = {}
+        
+        for role, interview in interviews.items():
+            print(f"🔥 Processing {role} roast: {interview['personality']}")
+            print(f"   Savage response preview: {interview['response'][:100]}...")
+            
+            # Convert to voice
+            audio_bytes = await letta_service.convert_to_voice_with_vapi(
+                interview["response"], 
+                interview["voice_style"]
+            )
+            
+            if audio_bytes:
+                print(f"🔊 Voice generated for {role} ({len(audio_bytes)} bytes)")
+                # Create audio directory if it doesn't exist
+                audio_dir = "static/interviews"
+                os.makedirs(audio_dir, exist_ok=True)
+                
+                # Save audio file temporarily
+                timestamp = int(time.time())
+                audio_filename = f"interview_{game_id}_{role}_{timestamp}.mp3"
+                audio_path = f"{audio_dir}/{audio_filename}"
+                
+                try:
+                    with open(audio_path, "wb") as f:
+                        f.write(audio_bytes)
+                    
+                    # Verify the file was written correctly
+                    if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+                        interview_audio[role] = {
+                            "audio_url": f"/static/interviews/{audio_filename}",
+                            "text": interview["response"],
+                            "question": interview["question"],
+                            "personality": interview["personality"],
+                            "model": interview["model"],
+                            "voice_style": interview["voice_style"]
+                        }
+                        print(f"✅ Audio saved: {audio_path} ({os.path.getsize(audio_path)} bytes)")
+                        print(f"🔗 Audio URL: http://localhost:8000/static/interviews/{audio_filename}")
+                    else:
+                        print(f"❌ Audio file verification failed: {audio_path}")
+                        raise Exception("Audio file not created properly")
+                        
+                except Exception as e:
+                    print(f"❌ Error saving audio file: {e}")
+                    # Text-only fallback
+                    interview_audio[role] = {
+                        "audio_url": None,
+                        "text": interview["response"],
+                        "question": interview["question"],
+                        "personality": interview["personality"],
+                        "model": interview["model"],
+                        "voice_style": interview["voice_style"]
+                    }
+            else:
+                print(f"⚠️  No audio generated for {role}, using text-only")
+                # Text-only fallback
+                interview_audio[role] = {
+                    "audio_url": None,
+                    "text": interview["response"],
+                    "question": interview["question"],
+                    "personality": interview["personality"],
+                    "model": interview["model"],
+                    "voice_style": interview["voice_style"]
+                }
+        
+        # Broadcast to all game spectators
+        broadcast_data = {
+            "type": "post_game_interviews",  # Keep same type for frontend compatibility
+            "interviews": interview_audio
+        }
+        
+        print(f"📡 Broadcasting to WebSocket clients...")
+        
+        # Broadcast to both game channel and vote channel for compatibility
+        await manager.broadcast_to_game(
+            json.dumps(broadcast_data),
+            game_id
+        )
+        
+        # Also broadcast to vote channel (where Wordle connects)
+        await manager.broadcast_to_game(
+            json.dumps(broadcast_data),
+            f"votes-{game_id}"
+        )
+        
+        print(f"📡 Broadcast sent to both game_id and votes-{game_id} channels")
+        
+        print(f"✅ Successfully broadcasted SAVAGE ROAST for game {game_id}")
+        
+    except Exception as e:
+        print(f"❌ Error broadcasting interviews: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ====================
 # BATTLESHIP ENDPOINTS
@@ -298,6 +474,20 @@ async def run_battleship_game_loop(game: BattleshipGame, websocket: WebSocket, g
                                 "winner": game.winner,
                                 "message": f"🎉 Player {game.winner} wins!"
                             })
+                            
+                            # LETTA INTEGRATION: Handle game completion
+                            game_data = {
+                                "game_duration": int(time.time() - getattr(game, 'start_time', time.time())),
+                                "winning_move": f"{col_letter}{row_idx + 1}",
+                                "total_moves": game.game_state.get('turn_count', 0),
+                                "match_quality": "intense" if game.game_state.get('turn_count', 0) > 20 else "quick"
+                            }
+                            
+                            asyncio.create_task(handle_game_completion(
+                                "Battleship", game.winner, game.player1_model, game.player2_model, 
+                                game_data, game_id
+                            ))
+                            
                             # Remove the game after it's finished
                             if game_id in battleship_games:
                                 del battleship_games[game_id]
@@ -353,6 +543,20 @@ async def run_battleship_game_loop(game: BattleshipGame, websocket: WebSocket, g
                                 "winner": game.winner,
                                 "message": f"🎉 Player {game.winner} wins!"
                             })
+                            
+                            # LETTA INTEGRATION: Handle game completion (random move case)
+                            game_data = {
+                                "game_duration": int(time.time() - getattr(game, 'start_time', time.time())),
+                                "winning_move": f"{col_letter}{row_idx + 1} (random)",
+                                "total_moves": game.game_state.get('turn_count', 0),
+                                "match_quality": "chaotic"
+                            }
+                            
+                            asyncio.create_task(handle_game_completion(
+                                "Battleship", game.winner, game.player1_model, game.player2_model, 
+                                game_data, game_id
+                            ))
+                            
                             # Remove the game after it's finished
                             if game_id in battleship_games:
                                 del battleship_games[game_id]
@@ -461,6 +665,22 @@ async def player_next_question(game_id: str, player: int):
                 game_id
             )
             session["is_active"] = False
+            
+            # LETTA INTEGRATION: Handle trivia game completion
+            game_data = {
+                "game_duration": final_results.get("race_time", 0),
+                "winning_move": "completed all questions first",
+                "final_scores": final_results.get("final_scores", {}),
+                "questions_completed": final_results.get("questions_completed", {}),
+                "match_quality": "intellectual battle"
+            }
+            
+            asyncio.create_task(handle_game_completion(
+                "Trivia", game.race_winner, 
+                game.player1.model_id if hasattr(game.player1, 'model_id') else "gpt-4o-mini", 
+                game.player2.model_id if hasattr(game.player2, 'model_id') else "claude-3-haiku", 
+                game_data, game_id
+            ))
         
         return result
         
@@ -577,6 +797,33 @@ async def make_wordle_guess(game_id: str, request: dict):
     
     detailed_reasoning = parse_reasoning_for_ui(model, reasoning, model_data['guesses'], model_data['feedback'])
     
+    # LETTA INTEGRATION: Handle Wordle game completion
+    if result['game_over'] and result['winner']:
+        # Determine player models for Letta integration
+        player1_model = "gpt-4o-mini"  # Default for openai
+        player2_model = "claude-3-haiku"  # Default for anthropic
+        
+        # Determine winner (1 = openai, 2 = anthropic)
+        winner_num = 1 if result['winner'] == 'openai' else 2
+        
+        # Get game data for interview context
+        game_data = {
+            "secret_word": game.secret_word,
+            "winning_guess": guess if result['winner'] == model else "completed first",
+            "game_duration": len(model_data['guesses']) * 30,  # Rough estimate
+            "guesses_made": {
+                "openai": len(game.models['openai']['guesses']),
+                "anthropic": len(game.models['anthropic']['guesses'])
+            },
+            "match_quality": "word puzzle battle"
+        }
+        
+        print(f"🎮 Wordle game completed! {result['winner']} wins!")
+        asyncio.create_task(handle_game_completion(
+            "Wordle", winner_num, player1_model, player2_model, 
+            game_data, game_id
+        ))
+    
     return {
         "guess": guess,
         "reasoning": reasoning,
@@ -619,6 +866,36 @@ async def make_wordle_guess_no_id(request: dict):
         }
     
     detailed_reasoning = parse_reasoning_for_ui(model, reasoning, model_data['guesses'], model_data['feedback'])
+    
+    # LETTA INTEGRATION: Handle Wordle game completion (backward compatibility)
+    if result['game_over'] and result['winner']:
+        # Determine player models for Letta integration
+        player1_model = "gpt-4o-mini"  # Default for openai
+        player2_model = "claude-3-haiku"  # Default for anthropic
+        
+        # Determine winner (1 = openai, 2 = anthropic)
+        winner_num = 1 if result['winner'] == 'openai' else 2
+        
+        # Get game data for interview context
+        game_data = {
+            "secret_word": current_wordle_game.secret_word,
+            "winning_guess": guess if result['winner'] == model else "completed first",
+            "game_duration": len(model_data['guesses']) * 30,  # Rough estimate
+            "guesses_made": {
+                "openai": len(current_wordle_game.models['openai']['guesses']),
+                "anthropic": len(current_wordle_game.models['anthropic']['guesses'])
+            },
+            "match_quality": "word puzzle battle"
+        }
+        
+        # Use a default game_id for backward compatibility
+        fallback_game_id = "wordle-legacy"
+        
+        print(f"🎮 Wordle game completed! {result['winner']} wins!")
+        asyncio.create_task(handle_game_completion(
+            "Wordle", winner_num, player1_model, player2_model, 
+            game_data, fallback_game_id
+        ))
     
     return {
         "guess": guess,
@@ -739,6 +1016,43 @@ async def connections_ai_turn(game_id: str, player: str, request: dict):
             }),
             game_id
         )
+        
+        # LETTA INTEGRATION: Handle Connections game completion
+        if game.game_over:
+            # Determine winner based on score
+            player1_game = session["player1_game"]
+            player2_game = session["player2_game"]
+            
+            player1_score = player1_game.score if hasattr(player1_game, 'score') else 0
+            player2_score = player2_game.score if hasattr(player2_game, 'score') else 0
+            
+            if player1_score > player2_score:
+                winner_num = 1
+            elif player2_score > player1_score:
+                winner_num = 2
+            else:
+                winner_num = player_num  # Current player wins in case of tie
+            
+            # Get game data for interview context
+            game_data = {
+                "final_scores": {
+                    "player1": player1_score,
+                    "player2": player2_score
+                },
+                "winning_move": guess,
+                "game_duration": 300,  # Rough estimate for connections
+                "categories_found": {
+                    "player1": len(getattr(player1_game, 'found_categories', [])),
+                    "player2": len(getattr(player2_game, 'found_categories', []))
+                },
+                "match_quality": "pattern recognition challenge"
+            }
+            
+            print(f"🎮 Connections game completed! Player {winner_num} wins!")
+            asyncio.create_task(handle_game_completion(
+                "Connections", winner_num, session["player1_model"], session["player2_model"], 
+                game_data, game_id
+            ))
         
         return {
             "player": player_num,
@@ -984,8 +1298,84 @@ async def health_check():
             "wordle": "ready",
             "connections": "ready",
             "debate": "ready"
-        }
+        },
+        "letta_personalities": letta_service.initialized
     }
+
+@app.get("/api/personalities")
+async def get_personality_stats():
+    """Get AI personality statistics and rivalry data"""
+    return {
+        "personalities": letta_service.get_personality_stats(),
+        "initialized": letta_service.initialized
+    }
+
+@app.post("/api/test-roast")
+async def test_roast():
+    """Manually trigger a test roast for debugging"""
+    if not letta_service:
+        return {"error": "Letta service not available"}
+    
+    try:
+        print("🧪 TEST: Manually generating roast...")
+        
+        # Test roast generation
+        interviews = await letta_service.generate_post_game_interviews(
+            player1_model="gpt-4o-mini",
+            player2_model="claude-3-haiku", 
+            winner=2,  # Claude-3-haiku wins
+            game_type="Wordle",
+            game_data={
+                "secret_word": "TEST",
+                "winning_guess": "TEST",  
+                "game_duration": 15,
+                "guesses_made": {"openai": 5, "anthropic": 3},
+                "match_quality": "manual test"
+            }
+        )
+        
+        if interviews:
+            print(f"✅ TEST: Generated interviews: {interviews}")
+            
+            # Convert to voice if we have a winner
+            if interviews.get('winner'):
+                winner_data = interviews['winner']
+                print(f"🎙️ TEST: Converting to voice...")
+                
+                audio_bytes = await letta_service.convert_to_voice_with_vapi(
+                    winner_data['response'], 
+                    winner_data.get('voice_style', 'default')
+                )
+                
+                if audio_bytes:
+                    # Save test audio file
+                    import uuid
+                    test_filename = f"test_roast_{int(time.time())}.mp3"
+                    audio_path = os.path.join("static", "interviews", test_filename)
+                    
+                    os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+                    with open(audio_path, "wb") as f:
+                        f.write(audio_bytes)
+                    
+                    interviews['winner']['audio_url'] = f"/static/interviews/{test_filename}"
+                    print(f"🎵 TEST: Audio saved to {audio_path}")
+                else:
+                    print("❌ TEST: Audio generation failed")
+            
+            return {"success": True, "interviews": interviews}
+        else:
+            print(f"❌ TEST: No interviews generated - this should not happen with fallback!")
+            return {"error": "Failed to generate interviews", "interviews": interviews}
+            
+    except Exception as e:
+        print(f"❌ TEST: Error generating roast: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+# Serve static audio files
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/api/default-models")
 async def get_default_models():
@@ -993,6 +1383,82 @@ async def get_default_models():
     return {
         "default_models": DEFAULT_MODELS,
         "supported_models": ["openai", "anthropic", "gemini", "groq"]
+    }
+
+@app.get("/api/test/audio-files")
+async def test_audio_files():
+    """Test endpoint to check audio files in static directory"""
+    import os
+    audio_dir = "static/interviews"
+    
+    if not os.path.exists(audio_dir):
+        return {"error": "Audio directory doesn't exist", "path": audio_dir}
+    
+    files = []
+    for filename in os.listdir(audio_dir):
+        if filename.endswith(('.mp3', '.wav', '.ogg')):
+            file_path = os.path.join(audio_dir, filename)
+            file_size = os.path.getsize(file_path)
+            files.append({
+                "filename": filename,
+                "size_bytes": file_size,
+                "url": f"http://localhost:8000/static/interviews/{filename}",
+                "created": os.path.getctime(file_path)
+            })
+    
+    return {
+        "audio_directory": audio_dir,
+        "total_files": len(files),
+        "files": sorted(files, key=lambda x: x["created"], reverse=True)[:10]  # Last 10 files
+    }
+
+@app.post("/api/test/send-roast/{game_id}")
+async def test_send_roast(game_id: str):
+    """Test endpoint to manually send a fake roast message"""
+    # Get the latest audio file if any
+    audio_dir = "static/interviews"
+    latest_audio = None
+    
+    if os.path.exists(audio_dir):
+        audio_files = [f for f in os.listdir(audio_dir) if f.endswith(('.mp3', '.wav', '.ogg'))]
+        if audio_files:
+            latest_file = max(audio_files, key=lambda f: os.path.getctime(os.path.join(audio_dir, f)))
+            latest_audio = f"http://localhost:8000/static/interviews/{latest_file}"
+    
+    # Create test roast data
+    test_roast = {
+        "type": "post_game_interviews",
+        "interviews": {
+            "winner": {
+                "model": "test-model",
+                "personality": "Test Roaster",
+                "question": "How do you feel about crushing your opponent?",
+                "response": "That was easy! My opponent couldn't code their way out of a paper bag!",
+                "voice_style": "commanding",
+                "audio_url": latest_audio
+            }
+        }
+    }
+    
+    print(f"🧪 Sending test roast to game {game_id}")
+    print(f"🎵 Test audio URL: {latest_audio}")
+    
+    # Broadcast to both channels
+    await manager.broadcast_to_game(
+        json.dumps(test_roast),
+        game_id
+    )
+    
+    await manager.broadcast_to_game(
+        json.dumps(test_roast),
+        f"votes-{game_id}"
+    )
+    
+    return {
+        "message": "Test roast sent",
+        "game_id": game_id,
+        "audio_url": latest_audio,
+        "channels": [game_id, f"votes-{game_id}"]
     }
 
 if __name__ == "__main__":

@@ -203,6 +203,38 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
       setWinner(data.winner);
       setGameStatus(GAME_STATUS.FINISHED);
       setMessage(data.message);
+    } else if (data.type === 'post_game_interviews') {
+      console.log('🔥 Received post-game roast data:', data.interviews);
+      
+      // Auto-play winner roast audio without modal
+      if (data.interviews.winner && data.interviews.winner.audio_url) {
+        console.log('🎵 Auto-playing winner roast audio...');
+        
+        setTimeout(() => {
+          const audio = new Audio(data.interviews.winner.audio_url);
+          
+          audio.onplay = () => {
+            console.log('▶️ 🔥 BATTLESHIP ROAST PLAYING:', data.interviews.winner.personality);
+            console.log('💬 Roast:', data.interviews.winner.response || data.interviews.winner.text);
+          };
+          
+          audio.onended = () => {
+            console.log('✅ Battleship roast completed - savage!');
+          };
+          
+          audio.onerror = (e) => {
+            console.error('❌ Failed to play roast audio:', e);
+          };
+          
+          // Auto-play the roast
+          audio.play().catch(error => {
+            console.error('❌ Audio autoplay failed (might need user interaction):', error);
+          });
+          
+        }, 2000); // Delay after game ends
+      } else if (data.interviews.winner) {
+        console.log('📝 Roast generated but no audio - text only:', data.interviews.winner.response);
+      }
     }
   };
 
@@ -463,6 +495,8 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
           Demo Mode - Backend connection unavailable
         </div>
       )}
+
+      {/* Audio auto-plays when roast is generated */}
     </div>
   );
 };
