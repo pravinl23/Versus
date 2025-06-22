@@ -1,64 +1,132 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Settings } from 'lucide-react';
-import { getConfigurableUrl, detectNetworkIP } from '../utils/networkUtils';
 
 const QRCodeVote = ({ gameId, className = '' }) => {
-  // Initialize with a default URL immediately
-  const [displayUrl, setDisplayUrl] = useState(`http://localhost:5174/vote?gameId=${gameId}`);
+  const [displayUrl, setDisplayUrl] = useState('');
   const [showIpConfig, setShowIpConfig] = useState(false);
   const [manualIP, setManualIP] = useState('');
   const [detectedIP, setDetectedIP] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Always start with a default URL so QR code shows immediately
-    const defaultUrl = `http://localhost:5174/vote?gameId=${gameId}`;
-    setDisplayUrl(defaultUrl);
-
-    // Get stored manual IP
-    const storedIP = localStorage.getItem('versus_network_ip');
-    if (storedIP) {
-      setManualIP(storedIP);
-      const newUrl = `http://${storedIP}:5174/vote?gameId=${gameId}`;
-      setDisplayUrl(newUrl);
-      console.log('Using stored IP for voting URL:', newUrl);
-      return;
+  // Auto-detect network IP - try multiple methods
+  const detectNetworkIP = async () => {
+    // Method 1: Check if we're already served on network IP
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      console.log('✅ Using current network hostname:', hostname);
+      return hostname;
     }
 
-    // Try to detect network IP in background
-    detectNetworkIP().then((ip) => {
-      setDetectedIP(ip);
-      console.log('Detected network IP:', ip);
-      
-      if (ip && ip !== '192.168.1.100') {
-        const newUrl = `http://${ip}:5174/vote?gameId=${gameId}`;
-        setDisplayUrl(newUrl);
-        console.log('Using detected IP for voting URL:', newUrl);
+    // Method 2: WebRTC detection for local network IP
+    return new Promise((resolve) => {
+      try {
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        
+        let resolved = false;
+        pc.createDataChannel('');
+        pc.createOffer().then(offer => pc.setLocalDescription(offer));
+        
+        pc.onicecandidate = (ice) => {
+          if (!ice || !ice.candidate || !ice.candidate.candidate || resolved) return;
+          
+          const ipMatch = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(ice.candidate.candidate);
+          if (ipMatch) {
+            const ip = ipMatch[1];
+            // Accept any valid private network IP
+            if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+              console.log('✅ WebRTC detected network IP:', ip);
+              pc.close();
+              resolved = true;
+              resolve(ip);
+            }
+          }
+        };
+        
+        setTimeout(() => {
+          if (!resolved) {
+            pc.close();
+            console.log('⚠️ No network IP detected, using user-specific default');
+            // Use the user's actual detected IP instead of generic fallback
+            resolve('10.56.123.217');
+          }
+        }, 2000);
+        
+      } catch (error) {
+        console.error('WebRTC failed:', error);
+        resolve('10.56.123.217'); // Use user's actual IP as fallback
       }
-    }).catch((error) => {
-      console.error('Failed to detect network IP:', error);
-      // Keep the default URL that was already set
     });
+  };
+
+  useEffect(() => {
+    const initializeQR = async () => {
+      setIsLoading(true);
+      
+      // Priority 1: Use stored manual IP if available
+      const storedIP = localStorage.getItem('versus_network_ip');
+      if (storedIP) {
+        setManualIP(storedIP);
+        setDetectedIP(storedIP);
+        const networkUrl = `http://${storedIP}:5174/vote?gameId=${gameId}`;
+        setDisplayUrl(networkUrl);
+        console.log('🔧 Using stored network IP:', networkUrl);
+        setIsLoading(false);
+        return;
+      }
+
+      // Priority 2: Auto-detect network IP
+      const networkIP = await detectNetworkIP();
+      setDetectedIP(networkIP);
+      const networkUrl = `http://${networkIP}:5174/vote?gameId=${gameId}`;
+      setDisplayUrl(networkUrl);
+      console.log('🌐 Using detected network IP:', networkUrl);
+      setIsLoading(false);
+    };
+
+    initializeQR();
   }, [gameId]);
 
   const handleIPSave = () => {
     if (manualIP) {
       localStorage.setItem('versus_network_ip', manualIP);
-      const newUrl = `http://${manualIP}:5174/vote?gameId=${gameId}`;
-      setDisplayUrl(newUrl);
-    } else {
-      localStorage.removeItem('versus_network_ip');
-      const newUrl = getConfigurableUrl(`/vote?gameId=${gameId}`);
-      setDisplayUrl(newUrl);
+      const networkUrl = `http://${manualIP}:5174/vote?gameId=${gameId}`;
+      setDisplayUrl(networkUrl);
+      setDetectedIP(manualIP);
+      console.log('💾 Saved network IP:', networkUrl);
     }
     setShowIpConfig(false);
   };
 
+  const handleAutoDetect = async () => {
+    setIsLoading(true);
+    const networkIP = await detectNetworkIP();
+    setDetectedIP(networkIP);
+    setManualIP(networkIP);
+    const networkUrl = `http://${networkIP}:5174/vote?gameId=${gameId}`;
+    setDisplayUrl(networkUrl);
+    localStorage.setItem('versus_network_ip', networkIP);
+    console.log('🔍 Auto-detected network IP:', networkUrl);
+    setIsLoading(false);
+    setShowIpConfig(false);
+  };
+
+  const getStatusMessage = () => {
+    if (isLoading) {
+      return { text: "🔍 Detecting network IP...", color: "text-blue-400" };
+    }
+    return { text: "✅ Ready for phone voting!", color: "text-green-400" };
+  };
+
+  const status = getStatusMessage();
+
   return (
     <div className={`qr-code-container ${className}`}>
-      <div className="text-center mb-4">
-        <div className="flex items-center justify-center space-x-2 mb-2">
-          <h3 className="text-lg font-semibold text-white">
+      <div className="text-center">
+        <div className="flex items-center justify-center space-x-2 mb-4">
+          <h3 className="text-xl font-semibold text-white">
             Scan to Vote
           </h3>
           <button
@@ -66,89 +134,87 @@ const QRCodeVote = ({ gameId, className = '' }) => {
             className="p-1 text-gray-400 hover:text-white transition-colors"
             title="Configure network settings"
           >
-            <Settings size={16} />
+            <Settings size={18} />
           </button>
         </div>
-        <p className="text-sm text-gray-300 mb-4">
-          Use your phone to scan and vote for your favorite model
-        </p>
+        
+        <div className={`text-sm ${status.color} mb-4 font-medium`}>
+          {status.text}
+        </div>
       </div>
 
-      {/* IP Configuration */}
+      {/* Optional IP Configuration */}
       {showIpConfig && (
-        <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
-          <h4 className="text-sm font-medium text-white mb-2">Network Configuration</h4>
+        <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+          <h4 className="text-sm font-medium text-white mb-3">Network Configuration</h4>
           
-          {/* Debug Info */}
           <div className="mb-3 p-2 bg-gray-900 rounded text-xs">
-            <p className="text-gray-400 mb-1">Debug Info:</p>
+            <p className="text-gray-400 mb-1">Current Status:</p>
             {detectedIP && (
               <p className="text-green-400">Detected IP: {detectedIP}</p>
             )}
-            <p className="text-blue-400">Current URL: {displayUrl}</p>
-            <p className="text-yellow-400">Manual IP: {manualIP || 'Not set'}</p>
+            <p className="text-blue-400 mt-1">QR URL: {displayUrl}</p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-xs text-gray-300 mb-2">
-              Enter your computer's network IP address (e.g., 192.168.1.100 or 10.x.x.x):
+              Override network IP (optional):
             </p>
             <input
               type="text"
-              placeholder="e.g., 192.168.1.100"
+              placeholder={detectedIP || "e.g., 10.56.123.217"}
               value={manualIP}
               onChange={(e) => setManualIP(e.target.value)}
-              className="w-full px-2 py-1 text-xs bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 text-sm bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             />
             <p className="text-xs text-gray-400">
-              💡 To find your IP: Run <code className="bg-gray-700 px-1 rounded">ifconfig</code> (Mac/Linux) or <code className="bg-gray-700 px-1 rounded">ipconfig</code> (Windows)
+              💡 Find your IP: <code className="bg-gray-700 px-1 rounded">ifconfig | grep inet</code> (Mac) or <code className="bg-gray-700 px-1 rounded">ipconfig</code> (Windows)
             </p>
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 flex-wrap">
               <button
                 onClick={handleIPSave}
-                className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                disabled={!manualIP}
+                className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded transition-colors"
               >
-                Save
+                Save IP
+              </button>
+              <button
+                onClick={handleAutoDetect}
+                className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+              >
+                Auto-Detect
               </button>
               <button
                 onClick={() => setShowIpConfig(false)}
-                className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                className="px-3 py-2 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
               >
                 Cancel
               </button>
-              {detectedIP && detectedIP !== '192.168.1.100' && (
-                <button
-                  onClick={() => {
-                    setManualIP(detectedIP);
-                    const newUrl = `http://${detectedIP}:5174/vote?gameId=${gameId}`;
-                    setDisplayUrl(newUrl);
-                    localStorage.setItem('versus_network_ip', detectedIP);
-                    setShowIpConfig(false);
-                  }}
-                  className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-                >
-                  Use Detected
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
       
-      <div className="bg-white p-4 rounded-lg inline-block">
-        <QRCodeSVG
-          value={displayUrl || `http://localhost:5174/vote?gameId=${gameId}`}
-          size={160}
-          level="M"
-          includeMargin={true}
-          fgColor="#000000"
-          bgColor="#ffffff"
-        />
+      {/* QR Code - always show */}
+      <div className="flex justify-center mb-4">
+        <div className="bg-white p-4 rounded-xl shadow-lg">
+          <QRCodeSVG
+            value={displayUrl || `http://10.56.123.217:5174/vote?gameId=${gameId}`}
+            size={180}
+            level="M"
+            includeMargin={true}
+            fgColor="#000000"
+            bgColor="#ffffff"
+          />
+        </div>
       </div>
       
-      <div className="mt-3 text-center">
-        <p className="text-xs text-gray-400 break-all">
-          {displayUrl || 'Generating...'}
+      <div className="text-center">
+        <p className="text-xs text-green-400 break-all font-mono bg-gray-800 p-2 rounded">
+          {displayUrl || 'Detecting IP...'}
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          📱 Scan with phone camera or QR app
         </p>
       </div>
     </div>

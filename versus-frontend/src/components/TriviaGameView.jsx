@@ -1,7 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react'
+import SidebarVote from './SidebarVote'
 import './TriviaGameView.css'
 
 const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
+  // Get display names and info for models
+  const getModelInfo = (modelId) => {
+    if (!modelId) return { name: 'Unknown', color: '#6b7280', emoji: '🤖' }
+    
+    const id = modelId.toLowerCase()
+    
+    // OpenAI models
+    if (id.includes('gpt-4o')) return { name: 'GPT-4o', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt-4-turbo')) return { name: 'GPT-4 Turbo', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt-3.5')) return { name: 'GPT-3.5', color: '#10a37f', emoji: '🤖' }
+    if (id.includes('gpt') || id.includes('openai')) return { name: 'GPT-4', color: '#10a37f', emoji: '🤖' }
+    
+    // Anthropic models
+    if (id.includes('claude-3-opus')) return { name: 'Claude 3 Opus', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude-3-sonnet')) return { name: 'Claude 3 Sonnet', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude-3-haiku')) return { name: 'Claude 3 Haiku', color: '#d97706', emoji: '🧠' }
+    if (id.includes('claude') || id.includes('anthropic')) return { name: 'Claude 3', color: '#d97706', emoji: '🧠' }
+    
+    // Google models
+    if (id.includes('gemini-1.5-pro')) return { name: 'Gemini 1.5 Pro', color: '#4285f4', emoji: '✨' }
+    if (id.includes('gemini-1.5-flash')) return { name: 'Gemini 1.5 Flash', color: '#4285f4', emoji: '✨' }
+    if (id.includes('gemini')) return { name: 'Gemini Pro', color: '#4285f4', emoji: '✨' }
+    
+    // Groq/Other models
+    if (id.includes('llama')) return { name: 'Llama 3', color: '#f59e0b', emoji: '🦙' }
+    if (id.includes('mixtral')) return { name: 'Mixtral', color: '#f59e0b', emoji: '⚡' }
+    if (id.includes('groq')) return { name: 'Groq', color: '#f59e0b', emoji: '⚡' }
+    
+    // Fallback - capitalize the model name
+    return { 
+      name: modelId.charAt(0).toUpperCase() + modelId.slice(1), 
+      color: '#6b7280', 
+      emoji: '🤖' 
+    }
+  }
+
+  const player1Info = getModelInfo(player1Model)
+  const player2Info = getModelInfo(player2Model)
+
   // Race state for each player
   const [player1State, setPlayer1State] = useState({
     questionIndex: 0,
@@ -9,8 +49,7 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     currentQuestion: null,
     isAnswering: false,
     finished: false,
-    responses: [],
-    lastAnswer: null
+    responses: []
   })
   
   const [player2State, setPlayer2State] = useState({
@@ -19,12 +58,12 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     currentQuestion: null,
     isAnswering: false,
     finished: false,
-    responses: [],
-    lastAnswer: null
+    responses: []
   })
   
   const [raceState, setRaceState] = useState({
     totalQuestions: 20,
+    votingComplete: false,
     raceStarted: false,
     raceFinished: false,
     winner: null,
@@ -32,32 +71,28 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
   })
   
   const [websocket, setWebsocket] = useState(null)
+  
   const wsRef = useRef(null)
-  const raceStartedRef = useRef(false)
 
-  // WebSocket connection
+  // Handle when voting period ends
+  const handleGameStart = () => {
+    console.log('🎮 Voting complete, showing trivia start screen...')
+    setRaceState(prev => ({ ...prev, votingComplete: true }))
+  }
+
+  // WebSocket connection (only after voting is complete)
   useEffect(() => {
-    if (gameId && !raceStartedRef.current) {
-      console.log('Connecting to WebSocket for game:', gameId)
+    if (gameId && raceState.votingComplete) {
       const ws = new WebSocket(`ws://localhost:8000/api/trivia/ws/${gameId}`)
       
       ws.onopen = () => {
         console.log('WebSocket connected')
         setWebsocket(ws)
         wsRef.current = ws
-        
-        // Auto-start the race after a short delay
-        setTimeout(() => {
-          if (!raceStartedRef.current) {
-            raceStartedRef.current = true
-            startRace()
-          }
-        }, 1500)
       }
       
       ws.onmessage = (event) => {
         const message = JSON.parse(event.data)
-        console.log('WebSocket message:', message)
         
         if (message.type === 'player_question_result') {
           handlePlayerQuestionResult(message.data)
@@ -66,10 +101,6 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
         } else if (message.type === 'error') {
           console.error('Game error:', message.message)
         }
-      }
-      
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
       }
       
       ws.onclose = () => {
@@ -82,33 +113,26 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
         }
       }
     }
-  }, [gameId])
+  }, [gameId, raceState.votingComplete])
 
   const handlePlayerQuestionResult = (result) => {
-    const { player, question_number, response, correct, time, question } = result
-    
-    // Check if this is an error response
-    const isError = response && response.startsWith('Error:') || response && response.includes('API Error');
+    const { player, question_number, response, correct, time } = result
     
     // Update the specific player's state
     if (player === 1) {
       setPlayer1State(prev => ({
         ...prev,
         questionIndex: question_number,
-        score: prev.score + (correct && !isError ? 1 : 0),
+        score: prev.score + (correct ? 1 : 0),
         isAnswering: false,
-        currentQuestion: null,
-        lastAnswer: { response: response, correct: correct && !isError, question: question },
         responses: [...prev.responses, result]
       }))
     } else {
       setPlayer2State(prev => ({
         ...prev,
         questionIndex: question_number,
-        score: prev.score + (correct && !isError ? 1 : 0),
+        score: prev.score + (correct ? 1 : 0),
         isAnswering: false,
-        currentQuestion: null,
-        lastAnswer: { response: response, correct: correct && !isError, question: question },
         responses: [...prev.responses, result]
       }))
     }
@@ -118,7 +142,7 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
       if (!raceState.raceFinished) {
         askNextQuestion(player)
       }
-    }, 3000) // Show answer for 3 seconds
+    }, 2000) // 2 second delay to show the result
   }
 
   const handleRaceFinished = (finalResults) => {
@@ -185,7 +209,6 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
   }
 
   const startRace = () => {
-    console.log('Starting race...')
     setRaceState(prev => ({ ...prev, raceStarted: true }))
     
     // Start asking questions to both players
@@ -193,13 +216,73 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     askNextQuestion(2)
   }
 
-  // Show countdown before race starts
+  // Show voting interface first
+  if (!raceState.votingComplete) {
+    return (
+      <div className="trivia-game-container">
+        <SidebarVote 
+          gameId={gameId} 
+          onGameStart={handleGameStart}
+        />
+        
+        <div className="game-start-screen">
+          <h1>🏁 TRIVIA RACE</h1>
+          
+          <div className="vs-setup">
+            <div className="player-card">
+              <div className="player-emoji">{player1Info.emoji}</div>
+              <h3>{player1Info.name}</h3>
+              <p>Player 1</p>
+            </div>
+            
+            <div className="vs-divider">VS</div>
+            
+            <div className="player-card">
+              <div className="player-emoji">{player2Info.emoji}</div>
+              <h3>{player2Info.name}</h3>
+              <p>Player 2</p>
+            </div>
+          </div>
+          
+          <div className="game-info">
+            <p>🏁 RACE TO FINISH 20 QUESTIONS FIRST!</p>
+            <p>Pre-game voting in progress...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!raceState.raceStarted) {
     return (
-      <div className="trivia-container">
-        <div className="trivia-countdown">
-          <h1>TRIVIA</h1>
-          <div className="countdown-text">STARTING...</div>
+      <div className="trivia-game-container">
+        <div className="game-start-screen">
+          <h1>🏁 TRIVIA RACE</h1>
+          
+          <div className="vs-setup">
+            <div className="player-card">
+              <div className="player-emoji">{player1Info.emoji}</div>
+              <h3>{player1Info.name}</h3>
+              <p>Player 1</p>
+            </div>
+            
+            <div className="vs-divider">VS</div>
+            
+            <div className="player-card">
+              <div className="player-emoji">{player2Info.emoji}</div>
+              <h3>{player2Info.name}</h3>
+              <p>Player 2</p>
+            </div>
+          </div>
+          
+          <div className="game-info">
+            <p>🏁 RACE TO FINISH 20 QUESTIONS FIRST!</p>
+            <p>Each model answers independently • First to complete wins!</p>
+          </div>
+          
+          <button className="start-game-btn" onClick={startRace}>
+            START RACE
+          </button>
         </div>
       </div>
     )
@@ -207,99 +290,87 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
 
   if (raceState.raceFinished) {
     return (
-      <div className="trivia-container">
-        <button 
-          className="back-button"
-          onClick={onGameEnd}
-        >
-          ← Back to Games
-        </button>
-        
-        <div className="trivia-results">
-          <h1>GAME OVER</h1>
+      <div className="trivia-game-container">
+        <div className="game-over-screen">
+          <h1>🏆 RACE FINISHED!</h1>
           
-          <div className="results-grid">
-            <div className={`result-card ${raceState.winner === 1 ? 'winner' : ''}`}>
-              <h2>{player1Model.name || player1Model.id}</h2>
+          <div className="final-scores">
+            <div className={`final-score-card ${raceState.winner === 1 ? 'winner' : ''}`}>
+              <div className="player-emoji">{player1Info.emoji}</div>
+              <h3>{player1Info.name}</h3>
               <div className="score">{player1State.score}/20</div>
-              <div className="accuracy">
-                {((player1State.score / 20) * 100).toFixed(0)}% ACCURACY
-              </div>
-              {raceState.winner === 1 && <div className="winner-label">WINNER</div>}
+              <div className="questions-completed">{player1State.questionIndex} questions</div>
+              {raceState.winner === 1 && <div className="winner-badge">WINNER!</div>}
             </div>
             
-            <div className="vs-divider">VS</div>
-            
-            <div className={`result-card ${raceState.winner === 2 ? 'winner' : ''}`}>
-              <h2>{player2Model.name || player2Model.id}</h2>
+            <div className={`final-score-card ${raceState.winner === 2 ? 'winner' : ''}`}>
+              <div className="player-emoji">{player2Info.emoji}</div>
+              <h3>{player2Info.name}</h3>
               <div className="score">{player2State.score}/20</div>
-              <div className="accuracy">
-                {((player2State.score / 20) * 100).toFixed(0)}% ACCURACY
-              </div>
-              {raceState.winner === 2 && <div className="winner-label">WINNER</div>}
+              <div className="questions-completed">{player2State.questionIndex} questions</div>
+              {raceState.winner === 2 && <div className="winner-badge">WINNER!</div>}
             </div>
           </div>
           
           <div className="race-time">
-            COMPLETED IN {raceState.raceTime.toFixed(1)}s
+            Race completed in {raceState.raceTime.toFixed(1)} seconds
           </div>
           
-          <button className="play-again-button" onClick={onGameEnd}>
-            PLAY AGAIN
+          <button className="new-game-btn" onClick={onGameEnd}>
+            NEW RACE
           </button>
         </div>
       </div>
     )
   }
 
-  // Main race view
+  // Race view - split screen
   return (
-    <div className="trivia-container">
-      <button 
-        className="back-button"
-        onClick={onGameEnd}
-      >
-        ← Back to Games
-      </button>
-
-      {/* Header */}
-      <div className="trivia-header">
-        <h1>TRIVIA</h1>
-        <div className="race-status">RACING...</div>
+    <div className="trivia-race-container">
+      {/* Race Header */}
+      <div className="race-header">
+        <h1>🏁 TRIVIA RACE</h1>
+        <div className="race-status">
+          {raceState.raceFinished ? 'RACE FINISHED!' : 'RACING...'}
+        </div>
       </div>
 
-      {/* Split Screen */}
-      <div className="trivia-split">
+      {/* Split Screen Race View */}
+      <div className="race-split-view">
         {/* Player 1 Side */}
-        <div className="player-side">
-          <div className="player-info">
-            <h2>{player1Model.name || player1Model.id}</h2>
-            <div className="provider">{player1Model.provider || 'AI'}</div>
+        <div className="player-race-side" style={{ borderColor: player1Info.color }}>
+          <div className="player-header">
+            <div className="player-info">
+              <span className="player-emoji">{player1Info.emoji}</span>
+              <h2>{player1Info.name}</h2>
+            </div>
+            <div className="player-progress">
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{ 
+                    width: `${(player1State.questionIndex / raceState.totalQuestions) * 100}%`,
+                    backgroundColor: player1Info.color
+                  }}
+                />
+              </div>
+              <div className="progress-text">
+                {player1State.questionIndex}/{raceState.totalQuestions} • Score: {player1State.score}
+              </div>
+            </div>
           </div>
 
-          <div className="progress-section">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${(player1State.questionIndex / raceState.totalQuestions) * 100}%` }}
-              />
-            </div>
-            <div className="progress-text">
-              {player1State.questionIndex}/{raceState.totalQuestions} • SCORE: {player1State.score}
-            </div>
-          </div>
-
-          <div className="question-area">
+          <div className="current-question-area">
             {player1State.isAnswering && (
-              <div className="thinking">
-                <div className="thinking-text">THINKING...</div>
+              <div className="answering-state">
+                <div className="spinner" />
+                <p>Thinking...</p>
               </div>
             )}
 
             {player1State.currentQuestion && !player1State.isAnswering && (
               <div className="question-display">
-                <div className="question-number">Q{player1State.questionIndex}</div>
-                <div className="question-text">{player1State.currentQuestion.question}</div>
+                <h3>Q{player1State.questionIndex}: {player1State.currentQuestion.question}</h3>
                 {player1State.currentQuestion.choices && (
                   <div className="choices">
                     {player1State.currentQuestion.choices.map((choice, index) => (
@@ -312,100 +383,66 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
               </div>
             )}
 
-            {/* Show last answer after question is answered */}
-            {player1State.lastAnswer && !player1State.isAnswering && !player1State.currentQuestion && (
-              <div className="question-display">
-                {player1State.lastAnswer.question && (
-                  <>
-                    <div className="question-number">Q{player1State.questionIndex}</div>
-                    <div className="question-text">{player1State.lastAnswer.question.question}</div>
-                    {player1State.lastAnswer.question.choices && (
-                      <div className="choices">
-                        {player1State.lastAnswer.question.choices.map((choice, index) => {
-                          const letter = String.fromCharCode(65 + index);
-                          const isSelected = 
-                            player1State.lastAnswer.response === choice ||
-                            player1State.lastAnswer.response === letter ||
-                            player1State.lastAnswer.response === `${letter}. ${choice}`;
-                          return (
-                            <div 
-                              key={index} 
-                              className={`choice ${isSelected ? `selected ${player1State.lastAnswer.correct ? 'correct' : 'incorrect'}` : ''}`}
-                            >
-                              {letter}. {choice}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-                <div className="selected-answer-display">
-                  <div className={`selected-answer ${player1State.lastAnswer.correct ? 'correct' : 'incorrect'}`}>
-                    ANSWERED: {player1State.lastAnswer.response}
-                    <br />
-                    {player1State.lastAnswer.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {player1State.finished && (
-              <div className="finished">
-                <h2>FINISHED!</h2>
-                <p>FINAL SCORE: {player1State.score}/20</p>
+              <div className="finished-state">
+                <h2>🏁 FINISHED!</h2>
+                <p>Final Score: {player1State.score}/20</p>
               </div>
             )}
           </div>
 
-          {/* Recent answers */}
-          <div className="recent-answers">
-            {player1State.responses.slice(-5).map((response, index) => (
+          {/* Recent responses */}
+          <div className="recent-responses">
+            {player1State.responses.slice(-3).map((response, index) => (
               <div 
                 key={index} 
-                className={`answer-line ${response.correct ? 'correct' : 'incorrect'}`}
+                className={`mini-response ${response.correct ? 'correct' : 'incorrect'}`}
               >
-                Q{response.question_number}: {response.correct ? '✓' : '✗'} ({response.time.toFixed(1)}s)
+                Q{response.question_number}: {response.correct ? '✅' : '❌'} ({response.time.toFixed(1)}s)
               </div>
             ))}
           </div>
         </div>
 
         {/* VS Divider */}
-        <div className="vs-divider">
-          <div className="vs-text">VS</div>
+        <div className="vs-divider-race">
+          <span>VS</span>
         </div>
 
         {/* Player 2 Side */}
-        <div className="player-side">
-          <div className="player-info">
-            <h2>{player2Model.name || player2Model.id}</h2>
-            <div className="provider">{player2Model.provider || 'AI'}</div>
+        <div className="player-race-side" style={{ borderColor: player2Info.color }}>
+          <div className="player-header">
+            <div className="player-info">
+              <span className="player-emoji">{player2Info.emoji}</span>
+              <h2>{player2Info.name}</h2>
+            </div>
+            <div className="player-progress">
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{ 
+                    width: `${(player2State.questionIndex / raceState.totalQuestions) * 100}%`,
+                    backgroundColor: player2Info.color
+                  }}
+                />
+              </div>
+              <div className="progress-text">
+                {player2State.questionIndex}/{raceState.totalQuestions} • Score: {player2State.score}
+              </div>
+            </div>
           </div>
 
-          <div className="progress-section">
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${(player2State.questionIndex / raceState.totalQuestions) * 100}%` }}
-              />
-            </div>
-            <div className="progress-text">
-              {player2State.questionIndex}/{raceState.totalQuestions} • SCORE: {player2State.score}
-            </div>
-          </div>
-
-          <div className="question-area">
+          <div className="current-question-area">
             {player2State.isAnswering && (
-              <div className="thinking">
-                <div className="thinking-text">THINKING...</div>
+              <div className="answering-state">
+                <div className="spinner" />
+                <p>Thinking...</p>
               </div>
             )}
 
             {player2State.currentQuestion && !player2State.isAnswering && (
               <div className="question-display">
-                <div className="question-number">Q{player2State.questionIndex}</div>
-                <div className="question-text">{player2State.currentQuestion.question}</div>
+                <h3>Q{player2State.questionIndex}: {player2State.currentQuestion.question}</h3>
                 {player2State.currentQuestion.choices && (
                   <div className="choices">
                     {player2State.currentQuestion.choices.map((choice, index) => (
@@ -418,60 +455,22 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
               </div>
             )}
 
-            {/* Show last answer after question is answered */}
-            {player2State.lastAnswer && !player2State.isAnswering && !player2State.currentQuestion && (
-              <div className="question-display">
-                {player2State.lastAnswer.question && (
-                  <>
-                    <div className="question-number">Q{player2State.questionIndex}</div>
-                    <div className="question-text">{player2State.lastAnswer.question.question}</div>
-                    {player2State.lastAnswer.question.choices && (
-                      <div className="choices">
-                        {player2State.lastAnswer.question.choices.map((choice, index) => {
-                          const letter = String.fromCharCode(65 + index);
-                          const isSelected = 
-                            player2State.lastAnswer.response === choice ||
-                            player2State.lastAnswer.response === letter ||
-                            player2State.lastAnswer.response === `${letter}. ${choice}`;
-                          return (
-                            <div 
-                              key={index} 
-                              className={`choice ${isSelected ? `selected ${player2State.lastAnswer.correct ? 'correct' : 'incorrect'}` : ''}`}
-                            >
-                              {letter}. {choice}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-                <div className="selected-answer-display">
-                  <div className={`selected-answer ${player2State.lastAnswer.correct ? 'correct' : 'incorrect'}`}>
-                    ANSWERED: {player2State.lastAnswer.response}
-                    <br />
-                    {player2State.lastAnswer.correct ? '✓ CORRECT!' : '✗ INCORRECT'}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {player2State.finished && (
-              <div className="finished">
-                <h2>FINISHED!</h2>
-                <p>FINAL SCORE: {player2State.score}/20</p>
+              <div className="finished-state">
+                <h2>🏁 FINISHED!</h2>
+                <p>Final Score: {player2State.score}/20</p>
               </div>
             )}
           </div>
 
-          {/* Recent answers */}
-          <div className="recent-answers">
-            {player2State.responses.slice(-5).map((response, index) => (
+          {/* Recent responses */}
+          <div className="recent-responses">
+            {player2State.responses.slice(-3).map((response, index) => (
               <div 
                 key={index} 
-                className={`answer-line ${response.correct ? 'correct' : 'incorrect'}`}
+                className={`mini-response ${response.correct ? 'correct' : 'incorrect'}`}
               >
-                Q{response.question_number}: {response.correct ? '✓' : '✗'} ({response.time.toFixed(1)}s)
+                Q{response.question_number}: {response.correct ? '✅' : '❌'} ({response.time.toFixed(1)}s)
               </div>
             ))}
           </div>

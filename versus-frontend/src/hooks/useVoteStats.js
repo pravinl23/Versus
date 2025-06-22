@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getBackendUrl } from '../utils/networkUtils';
 
-export const useVoteStats = (gameId) => {
+const useVoteStats = (gameId) => {
   const [voteStats, setVoteStats] = useState({
     gpt_4o: 0,
     claude: 0,
@@ -126,4 +126,7 @@ export const useVoteStats = (gameId) => {
   }, [gameId, fetchVoteStats]);
 
   return { voteStats, isLoading, error, refetch: fetchVoteStats };
-}; 
+};
+
+export { useVoteStats };
+export default useVoteStats; 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Vote, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Vote, CheckCircle, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { getBackendUrl } from '../utils/networkUtils';
 
 const VotePage = () => {
@@ -12,6 +12,7 @@ const VotePage = () => {
   const [voteSubmitted, setVoteSubmitted] = useState(false);
   const [error, setError] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
+  const [countdown, setCountdown] = useState(3);
 
   useEffect(() => {
     // Check if gameId exists
@@ -19,6 +20,19 @@ const VotePage = () => {
       setError('Invalid game ID. Please scan the QR code again.');
     }
   }, [gameId]);
+
+  // Countdown for refresh after vote
+  useEffect(() => {
+    if (voteSubmitted && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (voteSubmitted && countdown === 0) {
+      // Refresh the page to allow voting again
+      window.location.reload();
+    }
+  }, [voteSubmitted, countdown]);
 
   const submitVote = async (model) => {
     if (!gameId) {
@@ -49,16 +63,6 @@ const VotePage = () => {
       }
 
       setVoteSubmitted(true);
-      
-      // Auto-close after 3 seconds
-      setTimeout(() => {
-        // Close the tab/window if possible
-        if (window.history.length > 1) {
-          navigate(-1);
-        } else {
-          window.close();
-        }
-      }, 3000);
 
     } catch (err) {
       console.error('Error submitting vote:', err);
@@ -66,6 +70,10 @@ const VotePage = () => {
     } finally {
       setIsVoting(false);
     }
+  };
+
+  const handleVoteAgain = () => {
+    window.location.reload();
   };
 
   if (!gameId) {
@@ -99,12 +107,29 @@ const VotePage = () => {
             Thanks for voting for <span className="font-semibold text-blue-400">{selectedModel}</span>!
           </p>
           <p className="text-sm text-gray-400 mb-6">
-            Your vote has been recorded. This page will close automatically.
+            Your vote has been recorded. You can vote again in a moment!
           </p>
-          <div className="bg-gray-800 rounded-lg p-4 mb-4">
+          
+          <div className="bg-gray-800 rounded-lg p-4 mb-6">
             <p className="text-xs text-gray-400 mb-1">Game ID</p>
             <p className="font-mono text-sm text-blue-400">{gameId}</p>
           </div>
+
+          {/* Countdown and refresh */}
+          <div className="bg-blue-900 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <RefreshCw className="h-5 w-5 text-blue-400" />
+              <span className="text-blue-400 font-semibold">Refreshing to vote again...</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{countdown}</div>
+          </div>
+
+          <button
+            onClick={handleVoteAgain}
+            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
+          >
+            Vote Again Now
+          </button>
         </div>
       </div>
     );
@@ -117,8 +142,11 @@ const VotePage = () => {
         <div className="text-center mb-8">
           <Vote className="mx-auto h-12 w-12 text-blue-500 mb-4" />
           <h1 className="text-3xl font-bold text-white mb-2">Vote Now!</h1>
-          <p className="text-gray-300 mb-4">
+          <p className="text-gray-300 mb-2">
             Which AI model do you think will win this game?
+          </p>
+          <p className="text-sm text-yellow-400 mb-4">
+            💡 You can vote multiple times!
           </p>
           <div className="bg-gray-800 rounded-lg p-3 inline-block">
             <p className="text-xs text-gray-400 mb-1">Game ID</p>
@@ -191,8 +219,11 @@ const VotePage = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 mb-2">
             Powered by VERSUS • Real-time AI Battle Platform
+          </p>
+          <p className="text-xs text-gray-400">
+            🔄 Page refreshes after each vote for multiple voting
           </p>
         </div>
       </div>
