@@ -664,6 +664,109 @@ async def get_connections_state(game_id: str):
         "player2_model": session["player2_model"]
     }
 
+# ===================
+# VOTING ENDPOINTS
+# ===================
+
+# Store votes per game session
+vote_storage: Dict[str, Dict[str, int]] = {}
+
+class Vote(BaseModel):
+    gameId: str
+    model: str  # "gpt-4o" or "claude"
+
+@app.post("/api/vote")
+async def submit_vote(vote: Vote):
+    """Submit a vote for a model in a specific game"""
+    # Validate model
+    if vote.model.lower() not in ["gpt-4o", "claude"]:
+        raise HTTPException(status_code=400, detail="Invalid model. Must be 'gpt-4o' or 'claude'")
+    
+    # Initialize vote storage for game if it doesn't exist
+    if vote.gameId not in vote_storage:
+        vote_storage[vote.gameId] = {"gpt-4o": 0, "claude": 0}
+    
+    # Increment vote count
+    model_key = vote.model.lower()
+    vote_storage[vote.gameId][model_key] += 1
+    
+    # Calculate updated stats
+    votes = vote_storage[vote.gameId]
+    total = votes["gpt-4o"] + votes["claude"]
+    
+    # Broadcast vote update via WebSocket with complete data
+    await manager.broadcast_to_game(
+        json.dumps({
+            "type": "vote_update",
+            "data": {
+                "gameId": vote.gameId,
+                "votes": votes,
+                "total": total,
+                "percentages": {
+                    "gpt_4o": round((votes["gpt-4o"] / total * 100) if total > 0 else 0, 1),
+                    "claude": round((votes["claude"] / total * 100) if total > 0 else 0, 1)
+                }
+            }
+        }),
+        f"votes-{vote.gameId}"
+    )
+    
+    return {"message": "Vote recorded", "gameId": vote.gameId}
+
+@app.get("/api/vote/stats")
+async def get_vote_stats(gameId: str):
+    """Get voting statistics for a specific game"""
+    if gameId not in vote_storage:
+        # Initialize with 0 votes if game doesn't exist yet
+        vote_storage[gameId] = {"gpt-4o": 0, "claude": 0}
+    
+    votes = vote_storage[gameId]
+    total = votes["gpt-4o"] + votes["claude"]
+    
+    return {
+        "gameId": gameId,
+        "gpt_4o": votes["gpt-4o"],
+        "claude": votes["claude"],
+        "total": total,
+        "percentages": {
+            "gpt_4o": round((votes["gpt-4o"] / total * 100) if total > 0 else 0, 1),
+            "claude": round((votes["claude"] / total * 100) if total > 0 else 0, 1)
+        }
+    }
+
+@app.websocket("/api/vote/ws/{game_id}")
+async def vote_websocket(websocket: WebSocket, game_id: str):
+    """WebSocket endpoint for real-time vote updates"""
+    await manager.connect(websocket, f"votes-{game_id}")
+    try:
+        # Send current vote stats on connection
+        if game_id in vote_storage:
+            votes = vote_storage[game_id]
+            total = votes["gpt-4o"] + votes["claude"]
+            await websocket.send_text(json.dumps({
+                "type": "vote_update",
+                "data": {
+                    "gameId": game_id,
+                    "votes": votes,
+                    "total": total,
+                    "percentages": {
+                        "gpt_4o": round((votes["gpt-4o"] / total * 100) if total > 0 else 0, 1),
+                        "claude": round((votes["claude"] / total * 100) if total > 0 else 0, 1)
+                    }
+                }
+            }))
+        
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+                if message.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+            except:
+                pass
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, f"votes-{game_id}")
+
 # ====================
 # COMMON ENDPOINTS
 # ====================
