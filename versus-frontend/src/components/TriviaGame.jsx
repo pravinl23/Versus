@@ -7,7 +7,7 @@ const TriviaGame = () => {
   const navigate = useNavigate()
   const [gameId, setGameId] = useState(null)
   const [gameStarted, setGameStarted] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
   // Get stored models from sessionStorage (matching how they're stored in ModelSelection)
@@ -31,10 +31,12 @@ const TriviaGame = () => {
   console.log('Using models:', { player1Model, player2Model })
 
   useEffect(() => {
-    console.log('TriviaGame component mounted')
-    // Auto-start the game immediately
-    startNewGame()
-  }, [])
+    console.log('🎮 Starting trivia with models:', { player1Model, player2Model })
+    
+    // Generate game ID but don't start the game yet - wait for voting
+    const newGameId = `trivia-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    setGameId(newGameId)
+  }, [player1Model, player2Model])
 
   const startNewGame = async () => {
     console.log('Starting new trivia game...')
@@ -101,7 +103,7 @@ const TriviaGame = () => {
     )
   }
 
-  if (isLoading || !gameStarted) {
+  if (isLoading) {
     return (
       <div className="trivia-container">
         <div className="loading-screen">
@@ -114,6 +116,7 @@ const TriviaGame = () => {
     )
   }
 
+  // Show the TriviaGameView with pre-game voting system
   return (
     <TriviaGameView 
       gameId={gameId}
