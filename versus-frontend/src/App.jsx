@@ -9,6 +9,7 @@ import WordleGame from "./components/games/WordleGame"
 import ConnectionsGame from "./components/games/ConnectionsGame"
 import NewLandingPage from "./pages/LandingPage"
 import ModelSelection from "./pages/ModelSelection"
+import VotePage from "./pages/VotePage"
 
 
 const GAMES = [
@@ -212,6 +213,7 @@ function App() {
         <Route path="/model-selection" element={<ModelSelection />} />
         <Route path="/games" element={<MainMenu />} />
         <Route path="/trivia" element={<TriviaGame />} />
+        <Route path="/vote" element={<VotePage />} />
       </Routes>
     </Router>
   )
