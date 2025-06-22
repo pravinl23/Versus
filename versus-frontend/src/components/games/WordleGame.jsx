@@ -14,6 +14,33 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
   
   const { startGame, getNextMove, isLoading } = useGameLoop()
 
+  // Convert model IDs to the backend format
+  const getBackendModelName = (modelId) => {
+    if (modelId?.includes('gpt') || modelId?.includes('openai')) return 'openai'
+    if (modelId?.includes('claude') || modelId?.includes('anthropic')) return 'anthropic'
+    // Add more model mappings as needed
+    return modelId || 'openai' // fallback
+  }
+
+  const backendPlayer1 = getBackendModelName(player1Model)
+  const backendPlayer2 = getBackendModelName(player2Model)
+
+  // Get display names for models
+  const getDisplayName = (modelId) => {
+    if (!modelId) return 'Unknown'
+    if (modelId.includes('gpt-4o')) return 'GPT-4o'
+    if (modelId.includes('gpt-4-turbo')) return 'GPT-4 Turbo'
+    if (modelId.includes('gpt-3.5')) return 'GPT-3.5'
+    if (modelId.includes('claude-3-opus')) return 'Claude 3 Opus'
+    if (modelId.includes('claude-3-sonnet')) return 'Claude 3 Sonnet'
+    if (modelId.includes('claude-3-haiku')) return 'Claude 3 Haiku'
+    if (modelId.includes('gemini')) return 'Gemini'
+    return modelId.charAt(0).toUpperCase() + modelId.slice(1)
+  }
+
+  const player1DisplayName = getDisplayName(player1Model)
+  const player2DisplayName = getDisplayName(player2Model)
+
   const handleStartBattle = async (word) => {
     console.log('Starting battle with word:', word)
     setSecretWord(word)
@@ -64,8 +91,8 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
       try {
         // Both AIs make their moves SIMULTANEOUSLY
         const [openaiPromise, anthropicPromise] = [
-          getNextMove('openai'),
-          getNextMove('anthropic')
+          getNextMove(backendPlayer1),
+          getNextMove(backendPlayer2)
         ]
         
         // Wait for both moves to complete
@@ -182,7 +209,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
               AI WORDLE ARENA
             </h1>
             <p className="text-2xl text-slate-300 mb-6 font-medium">
-              GPT-4o vs Claude · Real-Time Battle
+              {player1DisplayName} vs {player2DisplayName} · Real-Time Battle
             </p>
             
             {gameState.game_over && (
@@ -190,10 +217,10 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
                 <div className="text-4xl font-black mb-4">
                   {gameState.winner === 'TIE' ? (
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">🤝 Epic Tie!</span>
-                  ) : gameState.winner === 'openai' ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">🏆 GPT-4o Victorious!</span>
-                  ) : gameState.winner === 'anthropic' ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">🏆 Claude Triumphant!</span>
+                  ) : gameState.winner === backendPlayer1 ? (
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">🏆 {player1DisplayName} Victorious!</span>
+                  ) : gameState.winner === backendPlayer2 ? (
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">🏆 {player2DisplayName} Triumphant!</span>
                   ) : (
                     <span className="text-slate-400">Battle Complete</span>
                   )}
@@ -234,8 +261,8 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
                 <ModernGameBoard
                   guesses={gameState.models.openai.guesses}
                   feedback={gameState.models.openai.feedback}
-                  modelName="GPT-4o"
-                  isWinner={gameState.winner === 'openai'}
+                  modelName={player1DisplayName}
+                  isWinner={gameState.winner === backendPlayer1}
                   guessCount={gameState.models.openai.guesses.length}
                 />
               </div>
@@ -245,8 +272,8 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
                 <ModernGameBoard
                   guesses={gameState.models.anthropic.guesses}
                   feedback={gameState.models.anthropic.feedback}
-                  modelName="Claude"
-                  isWinner={gameState.winner === 'anthropic'}
+                  modelName={player2DisplayName}
+                  isWinner={gameState.winner === backendPlayer2}
                   guessCount={gameState.models.anthropic.guesses.length}
                 />
               </div>

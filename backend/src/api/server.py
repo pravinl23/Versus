@@ -27,6 +27,21 @@ from src.games.wordle.wordle_game import WordleGame
 # Import Flask app for Wordle (we'll integrate it)
 from src.games.wordle.wordle_simple import app as wordle_flask_app, WordleGame as WordleSimpleGame, get_llm_guess, parse_reasoning_for_ui
 
+# Default model configurations
+DEFAULT_MODELS = {
+    "battleship": {"player1": "openai", "player2": "anthropic"},
+    "trivia": {"player1": "openai", "player2": "anthropic"},
+    "wordle": {"player1": "openai", "player2": "anthropic"}
+}
+
+def get_models_for_game(game_type: str, player1_model: Optional[str] = None, player2_model: Optional[str] = None):
+    """Get models for a game, using defaults if not specified"""
+    defaults = DEFAULT_MODELS.get(game_type, {"player1": "openai", "player2": "anthropic"})
+    return {
+        "player1": player1_model or defaults["player1"],
+        "player2": player2_model or defaults["player2"]
+    }
+
 app = FastAPI(title="VERSUS Unified Game Server", version="2.0.0")
 
 # Configure CORS
@@ -85,8 +100,14 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
             data = await websocket.receive_json()
             
             if data.get("type") == "start_game":
-                player1_model = data.get("player1Model", "openai")
-                player2_model = data.get("player2Model", "anthropic")
+                # Use default models if not provided
+                models = get_models_for_game("battleship", 
+                                           data.get("player1Model"), 
+                                           data.get("player2Model"))
+                player1_model = models["player1"]
+                player2_model = models["player2"]
+                
+                print(f"Starting battleship game with models: {player1_model} vs {player2_model}")
                 
                 # Create and run the battleship game
                 game = BattleshipGame(player1_model, player2_model)
@@ -229,8 +250,8 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
 # =================
 
 class GameStartRequest(BaseModel):
-    player1_model: str
-    player2_model: str
+    player1_model: Optional[str] = None
+    player2_model: Optional[str] = None
     question_count: Optional[int] = 20
 
 @app.post("/api/trivia/start")
@@ -240,9 +261,30 @@ async def start_trivia_game(request: GameStartRequest):
         game_id = str(uuid.uuid4())
         questions = get_random_questions(request.question_count)
         
+        # Map model IDs to backend format
+        def map_model_to_backend(model_id):
+            if not model_id:
+                return "openai"  # default fallback
+            model_id = model_id.lower()
+            if "gpt" in model_id or "openai" in model_id:
+                return "openai"
+            elif "claude" in model_id or "anthropic" in model_id:
+                return "anthropic"
+            elif "gemini" in model_id or "google" in model_id:
+                return "gemini"
+            elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
+                return "groq"
+            else:
+                return "openai"  # default fallback
+        
+        player1_backend = map_model_to_backend(request.player1_model)
+        player2_backend = map_model_to_backend(request.player2_model)
+        
+        print(f"Starting trivia game with models: {request.player1_model} ({player1_backend}) vs {request.player2_model} ({player2_backend})")
+        
         trivia_game = TriviaGame(
-            player1_model=request.player1_model,
-            player2_model=request.player2_model,
+            player1_model=player1_backend,
+            player2_model=player2_backend,
             questions=questions
         )
         
@@ -255,8 +297,8 @@ async def start_trivia_game(request: GameStartRequest):
             "game_id": game_id,
             "status": "started",
             "total_questions": len(questions),
-            "player1_model": request.player1_model,
-            "player2_model": request.player2_model
+            "player1_model": request.player1_model or "openai",
+            "player2_model": request.player2_model or "anthropic"
         }
         
     except Exception as e:
@@ -494,6 +536,14 @@ async def health_check():
             "trivia": "ready",
             "wordle": "ready"
         }
+    }
+
+@app.get("/api/default-models")
+async def get_default_models():
+    """Get default model configurations for all games"""
+    return {
+        "default_models": DEFAULT_MODELS,
+        "supported_models": ["openai", "anthropic", "gemini", "groq"]
     }
 
 if __name__ == "__main__":
