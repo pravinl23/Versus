@@ -4,7 +4,7 @@ export const useGameLoop = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   
-  const API_BASE = 'http://localhost:5002/api/wordle'
+  const API_BASE = 'http://localhost:8000/api/wordle'
   
   const startGame = async (secretWord) => {
     try {

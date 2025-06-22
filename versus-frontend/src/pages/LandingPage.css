@@ -1,0 +1,169 @@
+/* Import VT323 font */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'VT323', monospace;
+  color: #fff;
+}
+
+/* Main container */
+.fullscreen-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background: #000;
+  cursor: default;
+}
+
+/* Visual background */
+.fullscreen-visual-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.fullscreen-visual-background canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Content container */
+.content-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Main content */
+.main-content {
+  text-align: center;
+  max-width: 800px;
+  width: 100%;
+}
+
+/* Typography */
+.main-title {
+  font-family: 'VT323', monospace;
+  font-size: clamp(4rem, 10vw, 8rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: #fff;
+  margin-bottom: 1.5rem;
+  line-height: 0.9;
+}
+
+.main-subtitle {
+  font-family: 'VT323', monospace;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.2;
+  margin-bottom: 3rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  letter-spacing: 0.01em;
+}
+
+/* CTA Button */
+.main-cta {
+  display: inline-block;
+  padding: 1rem 3rem;
+  font-family: 'VT323', monospace;
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.main-cta:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Bottom navigation */
+.bottom-nav {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  right: 2rem;
+  display: flex;
+  justify-content: space-between;
+  z-index: 3;
+}
+
+.bottom-nav a {
+  font-family: 'VT323', monospace;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  font-size: 1.2rem;
+  font-weight: 400;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  letter-spacing: 0.01em;
+}
+
+.bottom-nav a:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.bottom-nav .arrow {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+/* Loading placeholder */
+.loading-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .main-title {
+    margin-bottom: 1rem;
+  }
+  
+  .main-subtitle {
+    margin-bottom: 2rem;
+    font-size: 1.3rem;
+  }
+  
+  .main-cta {
+    padding: 0.8rem 2rem;
+    font-size: 1.2rem;
+  }
+  
+  .bottom-nav {
+    justify-content: center;
+    gap: 2rem;
+  }
+}
+  

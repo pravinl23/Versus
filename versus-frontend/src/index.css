@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -29,7 +31,7 @@ body {
   min-width: 100vw;
   min-height: 100vh;
   overflow: hidden;
-  font-family: 'Inter', 'Segoe UI', 'Roboto', system-ui, sans-serif;
+  font-family: "Inter", "Segoe UI", "Roboto", system-ui, sans-serif;
   background: linear-gradient(135deg, #0f172a 0%, #000000 50%, #0f172a 100%);
 }
 
@@ -123,7 +125,10 @@ button:focus-visible {
 }
 
 /* Smooth transitions for interactive elements */
-button, .tile, .card, input {
+button,
+.tile,
+.card,
+input {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -146,7 +151,8 @@ button, .tile, .card, input {
 }
 
 @keyframes gradient-shift {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -188,7 +194,8 @@ button, .tile, .card, input {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
   }
   50% {
@@ -197,7 +204,8 @@ button, .tile, .card, input {
 }
 
 @keyframes emerald-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
   }
   50% {
@@ -206,7 +214,8 @@ button, .tile, .card, input {
 }
 
 @keyframes amber-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
   }
   50% {
@@ -235,7 +244,8 @@ button, .tile, .card, input {
 }
 
 /* Modern focus styles */
-button:focus-visible, input:focus-visible {
+button:focus-visible,
+input:focus-visible {
   outline: 2px solid rgba(59, 130, 246, 0.6);
   outline-offset: 2px;
 }
@@ -281,7 +291,7 @@ button:focus-visible, input:focus-visible {
 }
 
 .btn-modern::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
@@ -309,7 +319,10 @@ button:focus-visible, input:focus-visible {
   .grid-cols-12 {
     @apply grid-cols-1;
   }
-  .col-span-3, .col-span-4, .col-span-8, .col-span-9 {
+  .col-span-3,
+  .col-span-4,
+  .col-span-8,
+  .col-span-9 {
     @apply col-span-1;
   }
 }
