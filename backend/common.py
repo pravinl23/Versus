@@ -37,9 +37,69 @@ class LLMClient:
     
     async def get_move(self, prompt: str) -> str:
         """Get a move from the LLM"""
-        # Implementation varies by model
-        # This is a placeholder - implement based on model type
-        pass
+        return await self.get_response(prompt)
+    
+    async def get_response(self, prompt: str) -> str:
+        """Get a response from the LLM"""
+        try:
+            if self.model_type == "OPENAI":
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                response = await client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.7
+                )
+                return response.choices[0].message.content.strip()
+            
+            elif self.model_type == "ANTHROPIC":
+                import httpx
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": api_key,
+                            "Content-Type": "application/json",
+                            "anthropic-version": "2023-06-01"
+                        },
+                        json={
+                            "model": "claude-3-haiku-20240307",
+                            "max_tokens": 150,
+                            "messages": [{"role": "user", "content": prompt}]
+                        }
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data["content"][0]["text"].strip()
+                    else:
+                        return "I apologize, but I'm unable to respond at the moment."
+            
+            elif self.model_type == "GEMINI":
+                import google.generativeai as genai
+                genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+                model = genai.GenerativeModel('gemini-pro')
+                response = await model.generate_content_async(prompt)
+                return response.text.strip()
+            
+            elif self.model_type == "GROQ":
+                from groq import AsyncGroq
+                client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+                response = await client.chat.completions.create(
+                    model="mixtral-8x7b-32768",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.7
+                )
+                return response.choices[0].message.content.strip()
+            
+            else:
+                return "I'm a fallback response since the model is not configured."
+                
+        except Exception as e:
+            print(f"Error getting response from {self.model_type}: {e}")
+            return f"I apologize, but I encountered an error. Please try again."
 
 
 class BaseGame(ABC):

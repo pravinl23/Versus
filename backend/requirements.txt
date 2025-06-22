@@ -20,4 +20,7 @@ python-multipart==0.0.6
 setuptools>=65.5.1
 
 # Game-specific and general utilities
-numpy==1.26.4 
+numpy==1.26.4
+
+# Voice synthesis
+# elevenlabs==0.2.26  # Optional: for direct ElevenLabs integration 

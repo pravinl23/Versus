@@ -30,34 +30,26 @@ def setup_environment():
     
     print("🔧 Environment setup complete")
     
-    # Check for required environment variables
-    required_vars = ['OPENAI_API_KEY']
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        print(f"⚠️  Warning: Missing environment variables: {', '.join(missing_vars)}")
-        print("   Some LLM models may not work without proper API keys")
-        print("   Please set them in your environment or .env file")
-    
-    # Check for optional but recommended variables
-    optional_vars = ['ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'VAPI_API_KEY']
-    for var in optional_vars:
-        if os.getenv(var):
-            print(f"✅ {var} is set")
-        else:
-            print(f"⚠️  {var} not set - {var.split('_')[0]} features will be limited")
+    # Check for environment file
+    env_file = current_dir.parent / '.env'
+    if env_file.exists():
+        print(f"✅ Found .env file: {env_file}")
+    else:
+        print(f"⚠️  No .env file found. Copy {current_dir.parent / 'env.example'} to {env_file}")
 
 def check_dependencies():
-    """Check if required dependencies are installed"""
+    """Check if required packages are installed"""
     required_packages = [
         'fastapi',
         'uvicorn',
         'websockets',
         'httpx',
-        'pydantic'
+        'openai',
+        'anthropic'
     ]
     
     missing_packages = []
+    
     for package in required_packages:
         try:
             __import__(package)
@@ -65,69 +57,104 @@ def check_dependencies():
             missing_packages.append(package)
     
     if missing_packages:
-        print(f"❌ Missing required packages: {', '.join(missing_packages)}")
-        print("   Please install them with: pip install -r requirements.txt")
+        print(f"❌ Missing packages: {', '.join(missing_packages)}")
+        print("📦 Install with: pip install -r requirements.txt")
         return False
     
-    print("✅ All required dependencies are installed")
+    print("✅ All required packages installed")
     return True
 
-def start_server():
-    """Start the FastAPI server"""
-    host = os.getenv('HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', 8003))
-    reload = os.getenv('RELOAD', 'True').lower() == 'true'
+def check_api_keys():
+    """Check for API keys and provide setup instructions"""
+    print("\n🔑 Checking API Keys...")
     
-    print("\n🎭 Starting Voice-Powered AI Debate Arena Server...")
-    print(f"🌐 Server will run on: http://{host}:{port}")
-    print(f"📡 WebSocket endpoint: ws://{host}:{port}/api/debate/ws/{{debate_id}}")
-    print(f"🔄 Auto-reload: {'Enabled' if reload else 'Disabled'}")
-    print("\n📋 Available endpoints:")
-    print(f"   • POST /api/debate/start - Start new debate")
-    print(f"   • POST /api/debate/{{id}}/next-round - Advance round")
-    print(f"   • POST /api/debate/{{id}}/auto-advance - Auto-run entire debate")
-    print(f"   • GET /api/debate/{{id}}/state - Get debate state")
-    print(f"   • WebSocket /api/debate/ws/{{id}} - Real-time updates")
-    print("\n🚀 Starting server...\n")
+    keys_status = {}
+    api_keys = {
+        'OPENAI_API_KEY': 'OpenAI (GPT-4)',
+        'ANTHROPIC_API_KEY': 'Anthropic (Claude)',
+        'GEMINI_API_KEY': 'Google (Gemini Pro)',
+        'GROQ_API_KEY': 'Groq (Mixtral)',
+        'VAPI_API_KEY': 'Vapi (Voice Synthesis)'
+    }
+    
+    for key, service in api_keys.items():
+        if os.getenv(key):
+            keys_status[key] = True
+            print(f"  ✅ {service}: Found")
+        else:
+            keys_status[key] = False
+            print(f"  ❌ {service}: Missing")
+    
+    if not any(keys_status.values()):
+        print("\n⚠️  No API keys found!")
+        print("🔧 Set up your .env file with API keys to enable LLM functionality")
+    elif not keys_status.get('VAPI_API_KEY'):
+        print("\n⚠️  Vapi API key missing - voice synthesis will use browser TTS fallback")
+    else:
+        print("\n🎉 All API keys configured!")
+    
+    return keys_status
+
+def run_server():
+    """Run the FastAPI server"""
+    print("\n🚀 Starting Voice Debate Arena Server...")
+    print("=" * 50)
     
     try:
-        # Change to debate directory
-        os.chdir(Path(__file__).parent / 'debate')
+        # Change to the debate directory (subdirectory of current script location)
+        backend_dir = Path(__file__).parent
+        debate_dir = backend_dir / 'debate'
+        os.chdir(debate_dir)
+        print(f"📂 Changed to debate directory: {debate_dir}")
         
-        # Start the server
+        # Run uvicorn server
         cmd = [
             sys.executable, '-m', 'uvicorn',
             'server:app',
-            '--host', host,
-            '--port', str(port),
-            '--log-level', 'info'
+            '--host', os.getenv('HOST', '0.0.0.0'),
+            '--port', os.getenv('PORT', '8003'),
+            '--reload' if os.getenv('RELOAD', 'True').lower() == 'true' else '--no-reload'
         ]
         
-        if reload:
-            cmd.append('--reload')
+        print(f"📍 Server URL: http://localhost:{os.getenv('PORT', '8003')}")
+        print(f"📍 API Docs: http://localhost:{os.getenv('PORT', '8003')}/docs")
+        print(f"🎭 Debate Arena: Ready for voice-powered AI debates!")
+        print("=" * 50)
         
-        subprocess.run(cmd)
+        # Run the server
+        subprocess.run(cmd, check=True)
         
     except KeyboardInterrupt:
-        print("\n\n👋 Server stopped by user")
+        print("\n👋 Server stopped by user")
+    except subprocess.CalledProcessError as e:
+        print(f"\n❌ Server failed to start: {e}")
+        sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Server error: {e}")
+        print(f"\n💥 Unexpected error: {e}")
         sys.exit(1)
 
 def main():
     """Main function"""
-    print("🎭 VERSUS: Voice-Powered AI Debate Arena")
-    print("=" * 50)
+    print("🎭 Voice-Powered AI Debate Arena")
+    print("=" * 40)
     
     # Setup environment
     setup_environment()
     
     # Check dependencies
     if not check_dependencies():
+        print("\n📝 Install missing dependencies and try again")
         sys.exit(1)
     
-    # Start server
-    start_server()
+    # Check API keys
+    check_api_keys()
+    
+    # Small delay for user to read messages
+    print("\n⏳ Starting server in 2 seconds...")
+    time.sleep(2)
+    
+    # Run the server
+    run_server()
 
 if __name__ == "__main__":
     main() 

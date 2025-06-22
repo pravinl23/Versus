@@ -15,294 +15,265 @@ The Voice-Powered AI Debate Arena allows two AI models to participate in structu
 - **Audio Playback**: Replay any argument with one click
 
 ### 🧠 Intelligent Debate Logic
-- **Structured Format**: Opening statements, rebuttals, and closing arguments
-- **Context-Aware**: Each response considers opponent's previous arguments
-- **Multiple LLM Support**: GPT-4, Claude 3 Haiku, Gemini Pro, Groq Mixtral
-- **Automatic Judging**: GPT-4 evaluates debates and declares winners
+- **Structured Rounds**: Opening statements, rebuttals, and closing arguments
+- **Position Assignment**: Random PRO/CON assignment for fair debates
+- **Context Awareness**: Models reference previous arguments and counter-points
+- **Smart Prompting**: Specialized prompts for different debate phases
 
-### ⚡ Real-Time Experience
-- **WebSocket Communication**: Live updates during debates
-- **Auto-Advance Mode**: Watch complete debates unfold automatically
-- **Manual Control**: Step through rounds individually if preferred
-- **Live Transcript**: Real-time transcript with speaker identification
+### ⚖️ Automated Judging
+- **GPT-4 Judge**: Impartial evaluation of argument quality
+- **Reasoning Analysis**: Detailed explanation of judging decisions
+- **Multiple Criteria**: Logic, evidence, persuasiveness, and strategy
 
-### 🎯 Professional Interface
-- **Split-Screen Layout**: Clear visual separation of debaters
-- **Position Assignment**: Random PRO/CON position allocation
-- **Round Tracking**: Visual progress through debate rounds
-- **Audio Controls**: Individual playback for each statement
+### 🔄 Real-Time Interface
+- **WebSocket Updates**: Live debate progression and state changes
+- **Beautiful UI**: Modern React interface with Tailwind CSS styling
+- **Progress Tracking**: Visual indicators for debate advancement
+- **Interactive Controls**: Manual or automatic debate progression
 
-## 🏗️ Technical Architecture
+## 🛠️ Technical Architecture
 
-### Backend Components
-```
-backend/debate/
-├── debate_game.py      # Core debate logic and LLM integration
-├── server.py           # FastAPI server with WebSocket support
-└── README.md          # This documentation
-```
+### Backend Stack
+- **FastAPI**: High-performance async web framework
+- **WebSockets**: Real-time bidirectional communication
+- **Vapi Integration**: Professional voice synthesis API
+- **Multi-LLM Support**: OpenAI, Anthropic, Google, Groq
 
-### Key Classes
-- **`VoiceDebateGame`**: Main game controller handling debate flow
-- **`DebatePosition`**: Enum for PRO/CON positions  
-- **`DebateRoundType`**: Enum for opening/rebuttal/closing rounds
-- **`ConnectionManager`**: WebSocket connection management
+### Frontend Stack
+- **React 18**: Modern component-based UI framework
+- **Tailwind CSS**: Utility-first styling with gradients and animations
+- **WebSocket Client**: Real-time updates and interaction
+- **Browser Audio**: Fallback TTS and audio playback
 
-### APIs and Integrations
-- **FastAPI**: RESTful API endpoints and WebSocket server
-- **Vapi**: Primary voice synthesis and speech processing
-- **LLM APIs**: OpenAI, Anthropic, Google, Groq integrations
-- **WebSocket**: Real-time bidirectional communication
+### Voice Technology
+- **Vapi TTS**: High-quality neural voice synthesis
+- **Voice Profiles**: Distinct voices for each debater
+- **Audio Streaming**: Efficient audio delivery and playback
+- **Cross-Platform**: Works on all modern browsers
 
 ## 🚀 Quick Start
 
-### 1. Prerequisites
+### 1. Install Dependencies
 ```bash
-# Python 3.12+ required
-python --version
-
-# Install dependencies
 cd backend
 pip install -r requirements.txt
 ```
 
-### 2. Environment Setup
+### 2. Setup Environment
 ```bash
-# Copy environment template
 cp env.example .env
-
 # Edit .env with your API keys
-OPENAI_API_KEY=your_key_here
-ANTHROPIC_API_KEY=your_key_here
-VAPI_API_KEY=your_vapi_key_here
-# ... other keys
 ```
+
+Required API keys:
+- `VAPI_API_KEY`: Get from [Vapi Dashboard](https://dashboard.vapi.ai/)
+- `OPENAI_API_KEY`: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+- `ANTHROPIC_API_KEY`: Get from [Anthropic Console](https://console.anthropic.com/)
 
 ### 3. Start the Server
 ```bash
-# From backend directory
+cd backend/debate
 python run_debate.py
-
-# Server starts on http://localhost:8003
 ```
 
-### 4. Frontend Integration
-The React frontend automatically connects to the backend when you select "Debate" from the main games menu.
+### 4. Start the Frontend
+```bash
+cd versus-frontend
+npm install
+npm run dev
+```
 
-## 📚 API Reference
+### 5. Open the App
+Navigate to `http://localhost:5173` and click on "Debate" to begin!
 
-### Start Debate
+## 🎮 How to Use
+
+### Starting a Debate
+1. **Choose Topic**: Select from predefined topics or enter your own
+2. **Select Models**: Pick two different AI models to debate
+3. **Set Rounds**: Choose debate length (4-10 rounds)
+4. **Start Debate**: Launch the voice-powered debate arena
+
+### During the Debate
+- **Next Argument**: Generate the next argument manually
+- **Auto Advance**: Let the system run the entire debate automatically
+- **Replay Audio**: Click on any argument to hear it again
+- **Real-Time Updates**: Watch the debate unfold in real-time
+
+### After the Debate
+- **Automatic Judging**: GPT-4 evaluates the entire debate
+- **Winner Declaration**: Clear indication of the winning side
+- **Reasoning**: Detailed explanation of the judging decision
+
+## 📡 API Endpoints
+
+### Debate Management
 ```http
 POST /api/debate/start
-Content-Type: application/json
-
-{
-  "player1_model": "OPENAI",
-  "player2_model": "ANTHROPIC", 
-  "topic": "AI should be regulated by government",
-  "total_rounds": 6
-}
-```
-
-**Response:**
-```json
-{
-  "debate_id": "uuid-string",
-  "initial_state": {
-    "topic": "AI should be regulated by government",
-    "player1_position": "PRO",
-    "player2_position": "CON",
-    "current_speaker": 1,
-    "total_rounds": 6
-  }
-}
-```
-
-### Advance Round
-```http
-POST /api/debate/{debate_id}/next-round
-```
-
-### Auto-Advance Debate
-```http
-POST /api/debate/{debate_id}/auto-advance
-```
-
-### Get Debate State
-```http
 GET /api/debate/{debate_id}/state
+POST /api/debate/{debate_id}/argument
+POST /api/debate/{debate_id}/advance
+POST /api/debate/{debate_id}/judge
+DELETE /api/debate/{debate_id}
 ```
 
-### WebSocket Connection
+### Voice Synthesis
+```http
+POST /api/debate/{debate_id}/tts
 ```
-ws://localhost:8003/api/debate/ws/{debate_id}
+
+### Real-Time Updates
+```http
+WebSocket: /api/debate/ws/{debate_id}
 ```
 
-**Message Types:**
-- `connected`: Connection established
-- `current_state`: Initial debate state
-- `round_completed`: New round finished
-- `debate_finished`: Debate concluded with judgment
+## 🗣️ Voice Synthesis
 
-## 🎮 Game Flow
+### Vapi Integration
+The system uses Vapi's advanced neural TTS for high-quality voice synthesis:
 
-### 1. Setup Phase
-- User selects two different LLM models
-- Chooses or enters debate topic
-- Sets total rounds (4, 6, 8, or 10)
-- System randomly assigns PRO/CON positions
+```python
+async def synthesize_speech(self, text: str, player: str) -> Optional[str]:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.vapi.ai/tts/synthesize",
+            headers={"Authorization": f"Bearer {vapi_key}"},
+            json={
+                "text": text,
+                "voice": voice_settings["voice_id"],
+                "speed": voice_settings["speed"],
+                "format": "mp3"
+            }
+        )
+        return response.json().get("audio_url")
+```
 
-### 2. Debate Rounds
-Each round follows this pattern:
-1. **Generate Argument**: Current speaker's LLM generates response
-2. **Voice Synthesis**: Text converted to speech via Vapi
-3. **Audio Playback**: Argument spoken aloud
-4. **Transcript Update**: Real-time transcript updated
-5. **Speaker Switch**: Alternate to other model
+### Fallback System
+If Vapi is unavailable, the system automatically falls back to browser TTS:
 
-### 3. Round Types
-- **Opening (Rounds 1-2)**: Initial position statements
-- **Rebuttal (Middle rounds)**: Counter-arguments and rebuttals
-- **Closing (Final rounds)**: Summarizing arguments
+```javascript
+const speakText = (text, player) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = player === 'player1' ? maleVoice : femaleVoice;
+    speechSynthesis.speak(utterance);
+};
+```
 
-### 4. Judgment Phase
-- GPT-4 analyzes complete transcript
-- Evaluates logical consistency, rebuttals, persuasion
-- Declares winner with detailed reasoning
+## 🤖 Supported Models
 
-## 🔧 Configuration Options
+| Provider | Model | Voice Quality | Debate Style |
+|----------|-------|---------------|--------------|
+| OpenAI | GPT-4 | ⭐⭐⭐⭐⭐ | Analytical, structured |
+| Anthropic | Claude 3 | ⭐⭐⭐⭐⭐ | Thoughtful, nuanced |
+| Google | Gemini Pro | ⭐⭐⭐⭐ | Creative, diverse |
+| Groq | Mixtral | ⭐⭐⭐⭐ | Fast, direct |
 
-### Supported Models
-| Provider | Model | Icon | Voice |
-|----------|-------|------|-------|
-| OpenAI | GPT-4 | 🤖 | Male |
-| Anthropic | Claude 3 Haiku | 🧠 | Female |
-| Google | Gemini Pro | 💎 | Male |
-| Groq | Mixtral 8x7B | ⚡ | Female |
+## 🎯 Example Debate Topics
+
+### Technology & Society
+- "AI should be regulated by government"
+- "Social media does more harm than good"
+- "Cryptocurrency will replace traditional currency"
+
+### Environment & Energy
+- "Nuclear energy is the future of clean power"
+- "Renewable energy can replace fossil fuels completely"
+
+### Work & Economics
+- "Remote work is better than office work"
+- "Universal basic income should be implemented"
+
+### Ethics & Philosophy
+- "Human genetic modification should be allowed"
+- "Privacy is more important than security"
+
+## 🔧 Configuration
 
 ### Voice Settings
-- **Player 1**: `en-US-Studio-O` (Male voice)
-- **Player 2**: `en-US-Studio-M` (Female voice)
-- **Fallback**: Browser's built-in speech synthesis
-- **Rate**: 0.9x normal speed for clarity
+Customize voice characteristics in `debate_game.py`:
+```python
+self.voice_settings = {
+    "player1": {"voice_id": "jennifer", "speed": 1.0},
+    "player2": {"voice_id": "mark", "speed": 1.0}
+}
+```
 
 ### Debate Parameters
-- **Total Rounds**: 4-10 rounds (each model speaks equally)
-- **Response Length**: Maximum 80 words per argument
-- **Temperature**: 0.7 for creative but focused responses
-- **Context**: Previous opponent arguments included in prompts
-
-## 🔬 Advanced Features
-
-### Vapi Integration Details
+Adjust debate structure:
 ```python
-# Vapi TTS Configuration
-{
-  "assistant": {
-    "model": {"provider": "openai", "model": "gpt-3.5-turbo"},
-    "voice": {"provider": "11labs", "voiceId": "voice_id"}
-  }
-}
+class VoiceDebateGame:
+    def __init__(self, total_rounds=6):
+        self.total_rounds = total_rounds  # 4-10 recommended
+        self.round_types = self._setup_round_types()
 ```
 
-### WebSocket Message Format
-```json
-{
-  "type": "round_completed",
-  "debate_id": "uuid",
-  "round_data": {
-    "round": 1,
-    "speaker": 1,
-    "position": "PRO",
-    "round_type": "opening",
-    "text": "Argument text here...",
-    "audio_url": "https://...",
-    "timestamp": 1699123456.789
-  }
-}
-```
-
-### Judgment Criteria
-The AI judge evaluates based on:
-1. **Logical Consistency**: Internal coherence of arguments
-2. **Effective Rebuttals**: Direct responses to opponent points
-3. **Persuasive Power**: Compelling and clear presentation
-4. **Overall Performance**: Comprehensive debate effectiveness
-
-## 🛠️ Development
-
-### Adding New LLM Models
-1. Update `LLMClient` in `common.py`
-2. Add model handling in `debate_game.py`
-3. Update frontend model selection
-4. Add API key to environment template
-
-### Customizing Voice Settings
-```python
-# In debate_game.py
-self.player1_voice = "custom-voice-id"
-self.player2_voice = "another-voice-id"
-```
-
-### Extending Debate Formats
-```python
-class CustomDebateRoundType(Enum):
-    CROSS_EXAMINATION = "cross_examination"
-    FINAL_STATEMENT = "final_statement"
-```
+### Prompt Templates
+Customize argument generation in `_create_debate_prompt()`:
+- Opening statements
+- Rebuttal arguments  
+- Closing statements
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**Connection Failed**
-- Check if backend server is running on port 8003
-- Verify WebSocket connection in browser console
-- Ensure CORS settings allow frontend domain
+**Voice not playing**
+- Check Vapi API key in `.env`
+- Verify browser audio permissions
+- Try manual audio replay
 
-**Voice Playback Issues**
-- Verify VAPI_API_KEY is set correctly
-- Check browser's audio permissions
-- Test with browser TTS fallback
+**Models not responding**
+- Confirm LLM API keys are valid
+- Check internet connectivity
+- Review server logs for errors
 
-**LLM API Errors**
-- Confirm API keys are valid and have sufficient credits
-- Check rate limits for your API provider
-- Verify model names match provider specifications
+**WebSocket disconnections**
+- Refresh the browser page
+- Check server is running on port 8003
+- Verify firewall settings
 
 ### Debug Mode
+Enable detailed logging:
 ```bash
-# Start server with detailed logging
-PYTHONPATH=. uvicorn debate.server:app --host 0.0.0.0 --port 8003 --reload --log-level debug
+export DEBUG=1
+python run_debate.py
 ```
-
-## 📈 Performance Considerations
-
-- **Concurrent Debates**: Server supports multiple simultaneous debates
-- **Memory Usage**: Each debate stores full transcript in memory
-- **API Rate Limits**: Respects provider rate limits with error handling
-- **WebSocket Limits**: Automatically cleans up broken connections
-
-## 📝 License
-
-This project is part of the VERSUS platform - an AI benchmarking and competition system.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
 
 ## 🔮 Future Enhancements
 
-- **Multi-Round Formats**: Tournament-style debates
-- **Audience Voting**: Public voting on debate winners
-- **Video Integration**: Visual avatars for debaters
-- **Custom Topics**: User-generated debate topics with categories
-- **Analytics Dashboard**: Detailed performance metrics and statistics
+### Planned Features
+- **Multi-language Support**: Debates in different languages
+- **Audience Voting**: Real-time audience participation
+- **Video Integration**: Avatar-based visual debates
+- **Debate Tournaments**: Bracket-style competitions
+- **Custom Voice Training**: Personalized AI voices
+
+### Advanced Capabilities
+- **Emotion Analysis**: Detect debate emotion and intensity
+- **Fact Checking**: Real-time verification of claims
+- **Debate Coaching**: AI-powered improvement suggestions
+- **Live Streaming**: Broadcast debates to audiences
+
+## 📄 License
+
+This project is part of the VERSUS AI benchmarking platform.
+
+## 🤝 Contributing
+
+Contributions welcome! Areas for improvement:
+- Voice synthesis quality
+- Debate prompt engineering
+- UI/UX enhancements
+- Additional LLM integrations
+
+## 📞 Support
+
+For issues or questions:
+1. Check the troubleshooting section
+2. Review server logs for errors
+3. Ensure all API keys are configured
+4. Test with simple debate topics first
 
 ---
 
-Built with ❤️ for the Cal Hacks hackathon, featuring Vapi voice AI integration. 
+**Built with ❤️ for the Cal Hacks hackathon - showcasing the future of AI-powered debate and voice technology!** 
