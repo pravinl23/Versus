@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import SidebarVote from './SidebarVote'
 import './TriviaGameView.css'
 
 const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
+  const navigate = useNavigate()
+  
+  console.log('TriviaGameView mounted with props:', { gameId, player1Model, player2Model })
+
   // Get display names and info for models
   const getModelInfo = (modelId) => {
     if (!modelId) return { name: 'Unknown', color: '#6b7280', emoji: '🤖' }
@@ -39,8 +44,12 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     }
   }
 
-  const player1Info = getModelInfo(player1Model)
-  const player2Info = getModelInfo(player2Model)
+  // Handle both object and string model formats
+  const player1ModelId = typeof player1Model === 'string' ? player1Model : player1Model?.id
+  const player2ModelId = typeof player2Model === 'string' ? player2Model : player2Model?.id
+  
+  const player1Info = getModelInfo(player1ModelId)
+  const player2Info = getModelInfo(player2ModelId)
 
   // Race state for each player
   const [player1State, setPlayer1State] = useState({
@@ -76,8 +85,14 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
 
   // Handle when voting period ends
   const handleGameStart = () => {
-    console.log('🎮 Voting complete, showing trivia start screen...')
-    setRaceState(prev => ({ ...prev, votingComplete: true }))
+    console.log('🎮 Voting complete, starting race automatically...')
+    setRaceState(prev => ({ ...prev, votingComplete: true, raceStarted: true }))
+    
+    // Start asking questions to both players immediately
+    setTimeout(() => {
+      askNextQuestion(1)
+      askNextQuestion(2)
+    }, 1000) // Small delay for UI transition
   }
 
   // WebSocket connection (only after voting is complete)
@@ -106,7 +121,16 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
             console.log('🎵 Auto-playing trivia winner roast audio...')
             
             setTimeout(() => {
-              const audio = new Audio(message.interviews.winner.audio_url)
+              // Ensure we have the full URL
+              const audioUrl = message.interviews.winner.audio_url.startsWith('http') 
+                ? message.interviews.winner.audio_url 
+                : `http://localhost:8000${message.interviews.winner.audio_url}`
+              
+              console.log('🔊 Loading audio from:', audioUrl)
+              const audio = new Audio(audioUrl)
+              
+              // Set volume
+              audio.volume = 0.8
               
               audio.onplay = () => {
                 console.log('▶️ 🔥 TRIVIA ROAST PLAYING:', message.interviews.winner.personality)
@@ -119,11 +143,18 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
               
               audio.onerror = (e) => {
                 console.error('❌ Failed to play roast audio:', e)
+                console.error('Audio URL was:', audioUrl)
               }
               
               // Auto-play the roast
               audio.play().catch(error => {
                 console.error('❌ Audio autoplay failed (might need user interaction):', error)
+                // Try playing on next user interaction
+                const playOnInteraction = () => {
+                  audio.play().catch(e => console.error('Still failed:', e))
+                  document.removeEventListener('click', playOnInteraction)
+                }
+                document.addEventListener('click', playOnInteraction)
               })
               
             }, 2000) // Delay after race ends
@@ -240,18 +271,18 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     }
   }
 
-  const startRace = () => {
-    setRaceState(prev => ({ ...prev, raceStarted: true }))
-    
-    // Start asking questions to both players
-    askNextQuestion(1)
-    askNextQuestion(2)
-  }
-
   // Show voting interface first
   if (!raceState.votingComplete) {
+    console.log('Rendering voting interface - votingComplete:', raceState.votingComplete)
     return (
       <div className="trivia-game-container">
+        <button
+          onClick={() => navigate('/games')}
+          className="back-button"
+        >
+          ← Back
+        </button>
+        
         <SidebarVote 
           gameId={gameId} 
           onGameStart={handleGameStart}
@@ -285,44 +316,16 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
     )
   }
 
-  if (!raceState.raceStarted) {
-    return (
-      <div className="trivia-game-container">
-        <div className="game-start-screen">
-          <h1>🏁 TRIVIA RACE</h1>
-          
-          <div className="vs-setup">
-            <div className="player-card">
-              <div className="player-emoji">{player1Info.emoji}</div>
-              <h3>{player1Info.name}</h3>
-              <p>Player 1</p>
-            </div>
-            
-            <div className="vs-divider">VS</div>
-            
-            <div className="player-card">
-              <div className="player-emoji">{player2Info.emoji}</div>
-              <h3>{player2Info.name}</h3>
-              <p>Player 2</p>
-            </div>
-          </div>
-          
-          <div className="game-info">
-            <p>🏁 RACE TO FINISH 20 QUESTIONS FIRST!</p>
-            <p>Each model answers independently • First to complete wins!</p>
-          </div>
-          
-          <button className="start-game-btn" onClick={startRace}>
-            START RACE
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   if (raceState.raceFinished) {
     return (
       <div className="trivia-game-container">
+        <button
+          onClick={() => navigate('/games')}
+          className="back-button"
+        >
+          ← Back
+        </button>
+        
         <div className="game-over-screen">
           <h1>🏆 RACE FINISHED!</h1>
           
@@ -361,6 +364,13 @@ const TriviaGameView = ({ gameId, player1Model, player2Model, onGameEnd }) => {
   // Race view - split screen
   return (
     <div className="trivia-race-container">
+      <button
+        onClick={() => navigate('/games')}
+        className="back-button"
+      >
+        ← Back
+      </button>
+      
       {/* Race Header */}
       <div className="race-header">
         <h1>🏁 TRIVIA RACE</h1>

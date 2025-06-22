@@ -328,7 +328,7 @@ body {
 .start-button:hover:not(:disabled) {
   transform: scale(1.05);
   box-shadow: 0 10px 30px rgba(255, 255, 255, 0.3);
-}
+  }
 
 .start-button:disabled {
   background: #333;
@@ -379,12 +379,12 @@ body {
   
   .models-header .vs-text {
     font-size: 1.4rem;
-  }
-  
+}
+
   .game-card {
     padding: 1.5rem 1rem;
-  }
-  
+}
+
   .game-emoji {
     font-size: 2.5rem;
   }

@@ -68,39 +68,39 @@ const StartBattleModal = ({ onSubmit, onCancel }) => {
                   `}
                 >
                   {word[i] || ''}
-                </div>
+        </div>
               ))}
-            </div>
-            
+        </div>
+        
             <div className="relative max-w-3xl mx-auto">
-              <input
-                type="text"
-                value={word}
-                onChange={(e) => {
+            <input
+              type="text"
+              value={word}
+              onChange={(e) => {
                   const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '')
                   if (val.length <= 5) {
                     setWord(val)
-                    setError('')
+                setError('')
                   }
-                }}
+              }}
                 onKeyPress={handleKeyPress}
                 className="w-full px-16 py-10 bg-gray-900 border-4 border-gray-700 rounded-3xl text-7xl font-black text-center text-white placeholder-gray-600 focus:outline-none focus:border-white transition-all duration-300"
-                maxLength={5}
-                autoFocus
+              maxLength={5}
+              autoFocus
                 placeholder="TYPE"
                 style={{ letterSpacing: '0.2em' }}
-              />
-            </div>
-            
-            {error && (
+            />
+          </div>
+          
+          {error && (
               <div className="text-red-400 text-3xl font-bold animate-pulse">
                 {error}
-              </div>
-            )}
-            
+            </div>
+          )}
+          
             <div className="flex flex-col items-center gap-8">
-              <button
-                type="submit"
+            <button
+              type="submit"
                 disabled={word.length !== 5}
                 className={`
                   px-24 py-8 rounded-3xl text-4xl font-black transition-all duration-300
@@ -112,13 +112,13 @@ const StartBattleModal = ({ onSubmit, onCancel }) => {
                 `}
               >
                 START BATTLE
-              </button>
+            </button>
               
               <p className="text-gray-500 text-2xl">
                 Press Enter when ready
               </p>
-            </div>
-          </form>
+          </div>
+        </form>
         </div>
       </div>
     </div>

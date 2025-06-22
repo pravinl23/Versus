@@ -93,7 +93,7 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
         try {
           const data = JSON.parse(event.data);
           handleGameStateUpdate(data);
-        } catch (err) {
+    } catch (err) {
           console.error('Error parsing WebSocket message:', err);
         }
       };
@@ -428,7 +428,7 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
               </button>
               <button onClick={startDebate} className="topic-start-button">
                 Start Debate
-              </button>
+                </button>
             </div>
           </div>
         </div>
@@ -467,8 +467,8 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
                       </div>
                     </div>
                   ))}
+                </div>
               </div>
-            </div>
 
             {/* Center Divider */}
             <div className="debate-divider">
@@ -488,7 +488,7 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
                 <h3>{player2DisplayName}</h3>
                 <span className="position-label">CON</span>
               </div>
-              
+
               <div className="arguments-list">
                 {debateArgs
                   .filter(arg => arg.position === 'CON')
@@ -522,13 +522,13 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
                     <div>Relevance: {judgment.pro_scores.relevance.score}/20</div>
                   </div>
                   <div className="total-score">Total: {judgment.pro_total}/100</div>
-                </div>
+          </div>
 
                 <div className="winner-announcement">
                   <div className="trophy">🏆</div>
                   <div className="winner-name">{judgment.winner} WINS!</div>
                   <div className="margin">by {judgment.margin}</div>
-                </div>
+            </div>
 
                 <div className="score-card con-score">
                   <h4>{player2DisplayName} (CON)</h4>

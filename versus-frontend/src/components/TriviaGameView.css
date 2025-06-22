@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
 /* Main Container */
-.trivia-container {
+.trivia-game-container {
   background: #000;
   color: #fff;
   font-family: 'VT323', monospace;
@@ -494,6 +494,354 @@ body {
   color: #000;
 }
 
+/* Game Start Screen */
+.game-start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  text-align: center;
+  width: 100%;
+}
+
+.game-start-screen h1 {
+  font-size: 72px;
+  letter-spacing: 6px;
+  margin-bottom: 40px;
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.vs-setup {
+  display: flex;
+  align-items: center;
+  gap: 60px;
+  margin-bottom: 40px;
+}
+
+.player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px;
+  border: 2px solid #333;
+  background: rgba(0, 0, 0, 0.8);
+  min-width: 200px;
+  transition: all 0.3s ease;
+}
+
+.player-card:hover {
+  border-color: #fff;
+  transform: scale(1.05);
+}
+
+.player-emoji {
+  font-size: 60px;
+  margin-bottom: 15px;
+}
+
+.player-card h3 {
+  font-size: 28px;
+  margin: 0 0 10px 0;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+.player-card p {
+  font-size: 18px;
+  color: #666;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.vs-divider {
+  font-size: 48px;
+  color: #666;
+  letter-spacing: 4px;
+  font-weight: bold;
+}
+
+.game-info {
+  margin-bottom: 40px;
+}
+
+.game-info p {
+  font-size: 24px;
+  color: #999;
+  margin: 10px 0;
+  letter-spacing: 2px;
+}
+
+.start-game-btn {
+  background: #000;
+  color: #fff;
+  border: 2px solid #fff;
+  padding: 20px 60px;
+  font-size: 28px;
+  font-family: 'VT323', monospace;
+  letter-spacing: 3px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.start-game-btn:hover {
+  background: #fff;
+  color: #000;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+/* Race View Styles */
+.trivia-race-container {
+  background: #000;
+  color: #fff;
+  font-family: 'VT323', monospace;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.race-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.race-header h1 {
+  font-size: 48px;
+  letter-spacing: 4px;
+  margin: 0 0 10px 0;
+  color: #fff;
+}
+
+.race-split-view {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.player-race-side {
+  flex: 1;
+  border: 2px solid;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.player-header {
+  margin-bottom: 20px;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.player-emoji {
+  font-size: 36px;
+}
+
+.player-info h2 {
+  font-size: 32px;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.player-progress {
+  margin-top: 10px;
+}
+
+.current-question-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 300px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #222;
+  margin-bottom: 20px;
+}
+
+.answering-state {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top: 3px solid #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.answering-state p {
+  font-size: 24px;
+  color: #999;
+  letter-spacing: 2px;
+}
+
+.finished-state {
+  text-align: center;
+}
+
+.finished-state h2 {
+  font-size: 48px;
+  color: #0f0;
+  margin-bottom: 20px;
+  letter-spacing: 4px;
+}
+
+.finished-state p {
+  font-size: 28px;
+  color: #fff;
+  letter-spacing: 2px;
+}
+
+.recent-responses {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.mini-response {
+  font-size: 16px;
+  padding: 5px 10px;
+  border: 1px solid #222;
+  background: rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+}
+
+.mini-response.correct {
+  color: #0f0;
+  border-color: #0f0;
+}
+
+.mini-response.incorrect {
+  color: #f00;
+  border-color: #f00;
+}
+
+.vs-divider-race {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: #666;
+  padding: 0 20px;
+  letter-spacing: 3px;
+}
+
+/* Game Over Screen */
+.game-over-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  text-align: center;
+  width: 100%;
+}
+
+.game-over-screen h1 {
+  font-size: 72px;
+  letter-spacing: 6px;
+  margin-bottom: 40px;
+  color: #fff;
+}
+
+.final-scores {
+  display: flex;
+  gap: 60px;
+  margin-bottom: 40px;
+}
+
+.final-score-card {
+  padding: 40px;
+  border: 2px solid #333;
+  background: rgba(0, 0, 0, 0.8);
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.final-score-card.winner {
+  border-color: #0f0;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.final-score-card h3 {
+  font-size: 32px;
+  margin: 15px 0;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+.final-score-card .score {
+  font-size: 48px;
+  margin: 20px 0;
+  letter-spacing: 3px;
+  color: #fff;
+}
+
+.questions-completed {
+  font-size: 20px;
+  color: #999;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+}
+
+.winner-badge {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f0;
+  color: #000;
+  padding: 5px 20px;
+  font-size: 20px;
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+.new-game-btn {
+  background: #000;
+  color: #fff;
+  border: 2px solid #fff;
+  padding: 15px 40px;
+  font-size: 24px;
+  font-family: 'VT323', monospace;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.new-game-btn:hover {
+  background: #fff;
+  color: #000;
+  transform: scale(1.1);
+}
+
 /* Animations */
 @keyframes pulse {
   0%, 100% {
@@ -501,7 +849,7 @@ body {
   }
   50% {
     opacity: 0.5;
-  }
+}
 }
 
 @keyframes blink {
@@ -537,7 +885,7 @@ body {
     max-width: 100%;
     min-width: auto;
   }
-  
+
   .question-area {
     max-height: 350px;
   }

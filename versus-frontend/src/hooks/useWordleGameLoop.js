@@ -7,9 +7,9 @@ export const useGameLoop = () => {
   const [error, setError] = useState(null)
   
   const startGame = useCallback(async (secretWord) => {
-    setIsLoading(true)
-    setError(null)
-    
+      setIsLoading(true)
+      setError(null)
+      
     try {
       const response = await fetch(`${BACKEND_URL}/api/wordle/start`, {
         method: 'POST',

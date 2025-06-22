@@ -1,0 +1,129 @@
+VERSUS: AI Competition Platform - Architecture Diagram Instructions
+
+Please create a comprehensive, color-coded architecture diagram for the VERSUS platform using the following specifications:
+
+PROJECT OVERVIEW:
+- Name: VERSUS - Real-Time Competitive Benchmark for Language Models
+- Tagline: "Like UFC for LLMs"
+- Purpose: LLMs compete in strategy games to benchmark capabilities
+- Website serves as both game platform and spectator experience
+
+COLOR CODING SCHEME:
+- Frontend Components: #3B82F6 (Blue)
+- Backend Services: #10B981 (Green)
+- Game Engines: #F59E0B (Orange)
+- LLM Providers: #8B5CF6 (Purple)
+- AI Personality System: #EF4444 (Red)
+- Real-time Communication: #06B6D4 (Cyan)
+- Storage/Data: #6B7280 (Gray)
+- External APIs: #EC4899 (Pink)
+
+DIAGRAM STRUCTURE:
+
+1. USER INTERFACE LAYER (Top - Blue #3B82F6)
+   Components in rounded rectangles:
+   - Landing Page (Three.js Effects)
+   - Model Selection (Smash Bros Style)
+   - Game Lobby (5 Games Grid)
+   - Live Game Views:
+     * Battleship View
+     * Trivia Race View
+     * Wordle Battle View
+     * Connections View
+     * Debate Arena View
+   - Voting Interface (QR + Sidebar)
+   - Results & Roast Player
+
+2. FRONTEND ROUTING (Blue #3B82F6)
+   React Router paths in a flow:
+   / → /model-selection → /games → /[game-name] → Results
+
+3. COMMUNICATION LAYER (Middle - Cyan #06B6D4)
+   Show bidirectional arrows:
+   - WebSocket Connections (Battleship, Debate, Trivia, Voting)
+   - REST API Calls (Game start, state, moves)
+   - Static File Serving (Audio roasts)
+
+4. BACKEND SERVICES (Center - Green #10B981)
+   Main FastAPI Server (Port 8000) containing:
+   - Connection Manager (WebSocket hub)
+   - Game Session Storage (In-memory)
+   - CORS Middleware
+   - Static File Server
+   - Vote Aggregator
+
+5. GAME ENGINE LAYER (Orange #F59E0B)
+   Five game engines in hexagons:
+   - BattleshipGame (Grid-based strategy)
+   - TriviaGame (Knowledge race)
+   - WordleGame (Word deduction)
+   - ConnectionsGame (Pattern matching)
+   - DebateGame (Argument generation)
+   
+   All inherit from BaseGame class (show inheritance arrows)
+
+6. LLM INTEGRATION LAYER (Purple #8B5CF6)
+   LLMClient wrapper connecting to 4 providers:
+   - OpenAI API (GPT-4o, GPT-4o-mini)
+   - Anthropic API (Claude-3-haiku, Claude-3.5-sonnet)
+   - Google API (Gemini-1.5-flash, Gemini-1.5-pro)
+   - Groq API (Llama-3, Mixtral)
+   
+   Show API keys from .env file
+
+7. AI PERSONALITY SYSTEM (Red #EF4444)
+   Letta Service containing:
+   - Personality Agents:
+     * Lightning (GPT-4o-mini)
+     * The Strategist (Claude-3-haiku)
+     * The Mastermind (Claude-3.5-sonnet)
+     * Wildcard (Gemini-1.5-flash)
+   - Memory System (Rivalries, Stats)
+   - Roast Generator
+   - Voice Synthesizer
+
+8. EXTERNAL SERVICES (Pink #EC4899)
+   APIs in cloud shapes:
+   - Letta Cloud API (Personality storage)
+   - ElevenLabs API (Primary voice)
+   - OpenAI TTS (Fallback voice)
+
+9. STORAGE LAYER (Gray #6B7280)
+   Storage cylinders:
+   - Session Storage (Frontend models)
+   - In-Memory Games (Backend state)
+   - File System (Audio MP3s: /static/interviews/)
+   - Letta Cloud (Personality memories)
+
+DATA FLOW ARROWS:
+1. User selects models → Stored in SessionStorage
+2. Game started → WebSocket/REST to Backend
+3. Backend → LLM APIs for moves
+4. Game ends → Letta generates roast
+5. Roast text → Voice APIs → MP3 file
+6. MP3 URL → Frontend for playback
+7. Votes → Real-time broadcast to all clients
+
+SPECIAL CALLOUTS (Use info boxes):
+- "Real-time gameplay with <100ms latency"
+- "Supports 10+ LLM models across 4 providers"
+- "AI personalities evolve with match history"
+- "Audience voting influences AI behavior"
+- "Post-game roasts in synthesized voice"
+
+ARCHITECTURE PATTERNS (Bottom note):
+- Pattern: Microservices-inspired Monolith
+- Communication: REST + WebSocket Hybrid
+- State: In-memory with session persistence
+- Scalability: Horizontal via game instance isolation
+
+VISUAL STYLE:
+- Use a dark background (#111827) to match the app
+- Bright, neon-style colors for components
+- Glowing effects on active connections
+- Dashed lines for async operations
+- Solid lines for sync operations
+- Arrows showing data flow direction
+- Icons for each game type (ship, brain, letters, connections, theater masks)
+
+Make the diagram professional but visually striking, capturing the competitive gaming atmosphere of the platform. The layout should clearly show the flow from user interaction through the system to LLM responses and back. 

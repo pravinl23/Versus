@@ -33,10 +33,9 @@ const TriviaGame = () => {
   useEffect(() => {
     console.log('🎮 Starting trivia with models:', { player1Model, player2Model })
     
-    // Generate game ID but don't start the game yet - wait for voting
-    const newGameId = `trivia-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    setGameId(newGameId)
-  }, [player1Model, player2Model])
+    // Start the game immediately when component mounts
+    startNewGame()
+  }, [])
 
   const startNewGame = async () => {
     console.log('Starting new trivia game...')
@@ -45,8 +44,8 @@ const TriviaGame = () => {
 
     try {
       const requestBody = {
-        player1_model: player1Model.id,
-        player2_model: player2Model.id,
+        player1_model: typeof player1Model === 'string' ? player1Model : player1Model.id,
+        player2_model: typeof player2Model === 'string' ? player2Model : player2Model.id,
         question_count: 20
       }
       console.log('Request body:', requestBody)
@@ -87,8 +86,9 @@ const TriviaGame = () => {
   console.log('Current state:', { isLoading, gameStarted, error, gameId })
 
   if (error) {
+    console.error('Rendering error screen:', error)
     return (
-      <div className="trivia-container">
+      <div className="trivia-game-container">
         <div className="error-screen">
           <h1>ERROR</h1>
           <p>{error}</p>
@@ -104,8 +104,9 @@ const TriviaGame = () => {
   }
 
   if (isLoading) {
+    console.log('Rendering loading screen')
     return (
-      <div className="trivia-container">
+      <div className="trivia-game-container">
         <div className="loading-screen">
           <div className="loading-text">INITIALIZING TRIVIA...</div>
           <div className="loading-subtext">
@@ -117,6 +118,7 @@ const TriviaGame = () => {
   }
 
   // Show the TriviaGameView with pre-game voting system
+  console.log('Rendering TriviaGameView with gameId:', gameId)
   return (
     <TriviaGameView 
       gameId={gameId}

@@ -118,7 +118,7 @@ const ModernGameBoard = ({ guesses, feedback, modelName, isWinner, guessCount })
       </div>
       
       {/* Winner indicator */}
-      {isWinner && (
+              {isWinner && (
         <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
           <div className="bg-green-500 text-white px-8 py-3 rounded-full font-bold text-2xl animate-bounce shadow-2xl">
             🏆 WINNER!

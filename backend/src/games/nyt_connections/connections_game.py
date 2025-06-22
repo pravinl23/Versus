@@ -334,7 +334,7 @@ WORD1, WORD2, WORD3, WORD4"""
             'game_over': self.game_over,
             'winner': self.winner,
             'solution': self.answers if self.game_over else None
-        }
+        } 
     
     def _analyze_patterns(self) -> str:
         """Analyze remaining words for patterns to help guide the AI"""
