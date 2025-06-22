@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import SidebarVote from '../../SidebarVote';
 import GameBoard from '../../common/GameBoard';
 import GameTimer from '../../common/GameTimer';
-import useGameWebSocket from '../../../hooks/useGameWebSocket';
-import { GAME_STATUS, GAME_MESSAGES } from '../../../utils/gameUtils';
 import './Battleship.css';
 
 const BOARD_SIZE = 8;
 
-const Battleship = ({ player1Model, player2Model, gameId }) => {
-  // Game state
+const GAME_STATUS = {
+  WAITING: 'waiting',
+  IN_PROGRESS: 'in_progress', 
+  FINISHED: 'finished',
+  ERROR: 'error'
+};
+
+const Battleship = ({ player1Model, player2Model, onBack }) => {
+  const [gameId, setGameId] = useState('');
   const [gameStatus, setGameStatus] = useState(GAME_STATUS.WAITING);
   const [currentPlayer, setCurrentPlayer] = useState(1);
   const [player1Board, setPlayer1Board] = useState(createEmptyBoard());
@@ -17,9 +23,10 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   const [player2Shots, setPlayer2Shots] = useState(createEmptyBoard());
   const [message, setMessage] = useState('Starting game...');
   const [winner, setWinner] = useState(null);
-
-  // WebSocket connection
-  const { gameState, isConnected, sendMessage } = useGameWebSocket('battleship', gameId);
+  const [gameStartTime, setGameStartTime] = useState(null);
+  const [gameTimer, setGameTimer] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef(null);
 
   // Convert model IDs to the backend format
   const getBackendModelName = (modelId) => {
@@ -56,51 +63,122 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
   const player1DisplayName = getDisplayName(player1Model);
   const player2DisplayName = getDisplayName(player2Model);
 
-  // Start game automatically when connected
+  // Initialize game
   useEffect(() => {
-    if (isConnected && gameStatus === GAME_STATUS.WAITING) {
-      // Both AIs place ships automatically
-      sendMessage({
-        type: 'start_game',
-        player1Model: backendPlayer1,
-        player2Model: backendPlayer2,
-        autoPlaceShips: true
-      });
-      setGameStatus(GAME_STATUS.IN_PROGRESS);
-    }
-  }, [isConnected, gameStatus, backendPlayer1, backendPlayer2, sendMessage]);
+    const newGameId = `battleship-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setGameId(newGameId);
+    setGameStartTime(Date.now());
+    
+    // Try to connect to WebSocket, but don't fail if it doesn't work
+    connectWebSocket(newGameId);
+  }, []);
 
-  // Handle game state updates from WebSocket
-  useEffect(() => {
-    if (gameState) {
-      // Handle different message types
-      if (gameState.type === 'ship_placed') {
-        // Update board with ship placement
-        if (gameState.player === 1) {
-          setPlayer1Board(gameState.board);
-        } else {
-          setPlayer2Board(gameState.board);
-        }
-        setMessage(`${gameState.ship} placed for Player ${gameState.player}`);
-      } else if (gameState.type === 'placement_complete') {
-        // Ships are all placed, update both boards
-        setPlayer1Board(gameState.player1Board);
-        setPlayer2Board(gameState.player2Board);
-        setMessage(gameState.message);
+  const connectWebSocket = (gameId) => {
+    try {
+      const ws = new WebSocket(`ws://localhost:8000/games/battleship/${gameId}`);
+      
+      ws.onopen = () => {
+        console.log('Connected to Battleship WebSocket');
+        setIsConnected(true);
+        setMessage('Connected! Setting up ships...');
+        
+        // Start the game automatically
+        ws.send(JSON.stringify({
+          type: 'start_game',
+          player1Model: backendPlayer1,
+          player2Model: backendPlayer2,
+          autoPlaceShips: true
+        }));
         setGameStatus(GAME_STATUS.IN_PROGRESS);
-      } else if (gameState.type === 'placement_start') {
-        setMessage(gameState.message);
-      } else if (gameState.type === 'game_state') {
-        // Regular game state update
-        setCurrentPlayer(gameState.currentPlayer);
-        if (gameState.player1Shots) setPlayer1Shots(gameState.player1Shots);
-        if (gameState.player2Shots) setPlayer2Shots(gameState.player2Shots);
-        if (gameState.status) setGameStatus(gameState.status);
-        if (gameState.winner) setWinner(gameState.winner);
-        if (gameState.message) setMessage(gameState.message);
-      }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleGameStateUpdate(data);
+        } catch (err) {
+          console.error('Error parsing WebSocket message:', err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setMessage('Connection error - demo mode');
+        setIsConnected(false);
+        // Set up demo game
+        setupDemoGame();
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        setIsConnected(false);
+        if (!winner) {
+          setMessage('Connection lost - demo mode');
+          setupDemoGame();
+        }
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error);
+      setMessage('Backend unavailable - demo mode');
+      setupDemoGame();
     }
-  }, [gameState]);
+  };
+
+  const setupDemoGame = () => {
+    // Create demo boards with some ships
+    const demoBoard1 = createEmptyBoard();
+    const demoBoard2 = createEmptyBoard();
+    
+    // Add some demo ships
+    demoBoard1[0][0] = 'carrier';
+    demoBoard1[0][1] = 'carrier';
+    demoBoard1[0][2] = 'carrier';
+    
+    demoBoard2[2][2] = 'battleship';
+    demoBoard2[2][3] = 'battleship';
+    demoBoard2[2][4] = 'battleship';
+    
+    setPlayer1Board(demoBoard1);
+    setPlayer2Board(demoBoard2);
+    setGameStatus(GAME_STATUS.IN_PROGRESS);
+    setMessage('Demo mode - AI battle simulation');
+    
+    // Simulate some shots
+    setTimeout(() => {
+      const shots1 = createEmptyBoard();
+      const shots2 = createEmptyBoard();
+      shots1[2][2] = 'hit';
+      shots2[0][0] = 'hit';
+      setPlayer1Shots(shots1);
+      setPlayer2Shots(shots2);
+      setMessage(`${player1DisplayName} and ${player2DisplayName} exchanging fire!`);
+    }, 2000);
+  };
+
+  const handleGameStateUpdate = (data) => {
+    if (data.type === 'ship_placed') {
+      if (data.player === 1) {
+        setPlayer1Board(data.board);
+      } else {
+        setPlayer2Board(data.board);
+      }
+      setMessage(`${data.ship} placed for Player ${data.player}`);
+    } else if (data.type === 'placement_complete') {
+      setPlayer1Board(data.player1Board);
+      setPlayer2Board(data.player2Board);
+      setMessage(data.message);
+      setGameStatus(GAME_STATUS.IN_PROGRESS);
+    } else if (data.type === 'game_state') {
+      setCurrentPlayer(data.currentPlayer);
+      if (data.player1Shots) setPlayer1Shots(data.player1Shots);
+      if (data.player2Shots) setPlayer2Shots(data.player2Shots);
+      if (data.status) setGameStatus(data.status);
+      if (data.winner) setWinner(data.winner);
+      if (data.message) setMessage(data.message);
+    }
+  };
 
   // Initialize empty board
   function createEmptyBoard() {
@@ -119,19 +197,16 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     const isMiss = shots[row][col] === 'miss';
 
     if (isMiss && !cellValue) {
-      // Miss in empty water
       return <div className="cell-miss">💨</div>;
     } else if (cellValue) {
-      // Show ship with different colors based on ship type
       const shipColors = {
-        'carrier': '#FF6B6B',     // Red
-        'battleship': '#4ECDC4',  // Teal
-        'destroyer': '#45B7D1',   // Blue
-        'submarine': '#96CEB4',   // Green
-        'patrol': '#DDA0DD'       // Plum
+        'carrier': '#FF6B6B',
+        'battleship': '#4ECDC4',
+        'destroyer': '#45B7D1',
+        'submarine': '#96CEB4',
+        'patrol': '#DDA0DD'
       };
       
-      // If hit, show both ship and hit marker
       if (isHit) {
         return (
           <div 
@@ -144,7 +219,6 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
           </div>
         );
       } else {
-        // Just show the ship
         return (
           <div 
             className="cell-ship" 
@@ -172,10 +246,17 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
     return null;
   };
 
-  // Main game view - Split Screen
   return (
-    <div className="battleship-game split-screen">
+    <div className="battleship-game split-screen" style={{ paddingRight: '60px' }}>
+      <SidebarVote 
+        gameId={gameId} 
+        gameName={`Battleship: ${player1DisplayName} vs ${player2DisplayName}`} 
+      />
+      
       <div className="game-header">
+        <button onClick={onBack} className="back-button">
+          ← Back to Menu
+        </button>
         <GameTimer isActive={gameStatus === GAME_STATUS.IN_PROGRESS && !winner} />
         <div className="game-status-message">{message}</div>
       </div>
@@ -326,7 +407,7 @@ const Battleship = ({ player1Model, player2Model, gameId }) => {
 
       {!isConnected && (
         <div className="connection-status">
-          Connecting to game server...
+          Demo Mode - Backend connection unavailable
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import StartBattleModal from './wordle/StartBattleModal'
 import ModernGameBoard from './wordle/ModernGameBoard'
 import ModernGameInterface from './wordle/ModernGameInterface'
+import SidebarVote from '../SidebarVote'
 import { useGameLoop } from '../../hooks/useWordleGameLoop'
 
 const WordleGame = ({ player1Model, player2Model, onBack }) => {
@@ -11,6 +12,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
   const [latestReasoning, setLatestReasoning] = useState({})
   const [currentTurn, setCurrentTurn] = useState(1)
   const [isThinking, setIsThinking] = useState(false)
+  const [gameId, setGameId] = useState('')
   
   const { startGame, getNextMove, isLoading } = useGameLoop()
 
@@ -45,6 +47,10 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
     console.log('Starting battle with word:', word)
     setSecretWord(word)
     setShowModal(false)
+    
+    // Generate game ID for voting
+    const newGameId = `wordle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    setGameId(newGameId)
     
     // Start the game on backend
     const result = await startGame(word)
@@ -190,7 +196,13 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900" style={{ paddingRight: '60px' }}>
+      {/* Voting Sidebar */}
+      <SidebarVote 
+        gameId={gameId} 
+        gameName={`Wordle: ${player1DisplayName} vs ${player2DisplayName}`} 
+      />
+
       {/* Modern Header */}
       <div className="bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl">
         <div className="max-w-7xl mx-auto p-6">
