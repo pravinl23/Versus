@@ -4,11 +4,19 @@ uvicorn[standard]>=0.24.0
 python-dotenv==1.0.0
 websockets==12.0
 
-# LLM API clients
-openai==1.12.0
-anthropic==0.18.1
+# Additional dependencies from main
+setuptools>=65.5.1
+flask==3.0.0
+flask-cors==4.0.0
+
+# LLM API clients (using newer versions from main)
+openai==1.51.0
+anthropic==0.34.0
 google-generativeai==0.3.0
-groq==0.4.2
+groq==0.28.0
+
+# ML dependencies
+transformers==4.35.0
 
 # Utilities
 pydantic>=2.8.0
@@ -16,4 +24,4 @@ httpx==0.25.0
 python-multipart==0.0.6
 
 # Game-specific (optional)
-numpy>=1.26.0 
+numpy==1.26.4

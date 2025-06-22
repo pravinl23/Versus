@@ -14,29 +14,42 @@ load_dotenv()
 class LLMClient:
     """Wrapper for different LLM API clients"""
     
-    def __init__(self, model_type: str):
+    def __init__(self, model_type: str, use_async: bool = False):
         self.model_type = model_type.upper()
+        self.use_async = use_async
         self.client = self._initialize_client()
     
     def _initialize_client(self):
         if self.model_type == "OPENAI":
-            from openai import OpenAI
-            return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            if self.use_async:
+                from openai import AsyncOpenAI
+                return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            else:
+                from openai import OpenAI
+                return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.model_type == "ANTHROPIC":
-            from anthropic import Anthropic
-            return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            if self.use_async:
+                from anthropic import AsyncAnthropic
+                return AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            else:
+                from anthropic import Anthropic
+                return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         elif self.model_type == "GEMINI":
             import google.generativeai as genai
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
             return genai
         elif self.model_type == "GROQ":
-            from groq import Groq
-            return Groq(api_key=os.getenv("GROQ_API_KEY"))
+            if self.use_async:
+                from groq import AsyncGroq
+                return AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+            else:
+                from groq import Groq
+                return Groq(api_key=os.getenv("GROQ_API_KEY"))
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
     
     def get_move(self, prompt: str, game_state: dict = None) -> str:
-        """Get a move from the LLM"""
+        """Get a move from the LLM (sync version for battleship)"""
         try:
             if self.model_type == "OPENAI":
                 response = self.client.chat.completions.create(
@@ -109,14 +122,20 @@ class LLMClient:
             col = random.choice(string.ascii_uppercase[:8])
             row = random.randint(1, 8)
             return f"{col}{row}"
+    
+    async def get_move_async(self, prompt: str, game_state: dict = None) -> str:
+        """Get a move from the LLM (async version for other games)"""
+        # This method can be implemented for async games
+        # For now, it raises NotImplementedError to maintain compatibility with main branch
+        raise NotImplementedError("Async move generation should be implemented in individual game classes")
 
 
 class BaseGame(ABC):
     """Base class for all games"""
     
-    def __init__(self, player1_model: str, player2_model: str):
-        self.player1 = LLMClient(player1_model)
-        self.player2 = LLMClient(player2_model)
+    def __init__(self, player1_model: str, player2_model: str, use_async: bool = False):
+        self.player1 = LLMClient(player1_model, use_async)
+        self.player2 = LLMClient(player2_model, use_async)
         self.current_player = 1
         self.game_state = self.initialize_game()
         self.winner = None
@@ -193,4 +212,4 @@ class BaseGame(ABC):
             "success": False,
             "error": "Could not get valid move after retries",
             "player": self.current_player
-        } 
+        }

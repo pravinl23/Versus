@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import './App.css'
 import Battleship from './components/games/Battleship/Battleship'
+import TriviaGame from './components/TriviaGame'
+import WordleGame from './components/games/WordleGame'
 
 const MODELS = ['gemini', 'anthropic', 'openai', 'groq', 'custom']
 const GAMES = [
@@ -11,19 +14,42 @@ const GAMES = [
   { name: 'Connect 4', emoji: '🔴', description: 'Four in a row' }
 ]
 
-function App() {
+function MainMenu() {
+  const navigate = useNavigate()
   const [selectedGame, setSelectedGame] = useState(null)
   const [player1Model, setPlayer1Model] = useState('')
   const [player2Model, setPlayer2Model] = useState('')
   const [gameStarted, setGameStarted] = useState(false)
 
   const handleStartMatch = () => {
-    console.log('Starting match:', {
-      game: selectedGame.name,
-      player1: player1Model,
-      player2: player2Model
-    })
-    setGameStarted(true)
+    if (selectedGame.name === 'Trivia') {
+      navigate('/trivia', { 
+        state: { 
+          player1Model, 
+          player2Model 
+        } 
+      })
+    } else if (selectedGame.name === 'Wordle') {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+      setGameStarted(true)
+    } else if (selectedGame.name === 'Battleship') {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+      setGameStarted(true)
+    } else {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+    }
   }
 
   const handleBackToMenu = () => {
@@ -33,9 +59,13 @@ function App() {
     setGameStarted(false)
   }
 
-  // If game has started, show the game component
+  const handleBack = () => {
+    setGameStarted(false)
+  }
+
+  // If game has started, show the appropriate game component
   if (gameStarted && selectedGame) {
-    // For now, only Battleship is implemented
+    // Handle Battleship
     if (selectedGame.name === 'Battleship') {
       return (
         <div className="app">
@@ -65,7 +95,19 @@ function App() {
           />
         </div>
       )
-    } else {
+    } 
+    // Handle Wordle
+    else if (selectedGame.name === 'Wordle') {
+      return (
+        <WordleGame 
+          player1Model={player1Model}
+          player2Model={player2Model}
+          onBack={handleBack}
+        />
+      )
+    } 
+    // Handle other games that aren't implemented yet
+    else {
       return (
         <div className="app">
           <button 
@@ -183,13 +225,26 @@ function App() {
 
         <button 
           className="start-button" 
-          disabled={!player1Model || !player2Model}
+          disabled={!player1Model || !player2Model || (selectedGame.name === 'Wordle' && (!['OPENAI', 'ANTHROPIC'].includes(player1Model) || !['OPENAI', 'ANTHROPIC'].includes(player2Model)))}
           onClick={handleStartMatch}
         >
-          START GAME
+          {selectedGame.name === 'Wordle' && (!['OPENAI', 'ANTHROPIC'].includes(player1Model) || !['OPENAI', 'ANTHROPIC'].includes(player2Model)) 
+            ? 'Wordle only supports OpenAI and Anthropic'
+            : 'START GAME'}
         </button>
       </div>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/trivia" element={<TriviaGame />} />
+      </Routes>
+    </Router>
   )
 }
 
