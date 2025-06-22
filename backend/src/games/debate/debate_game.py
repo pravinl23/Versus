@@ -8,10 +8,17 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from enum import Enum
 
-from ...utils.common import BaseGame, LLMClient, GameStatus, PlayerAction
+from ...utils.common import BaseGame, LLMClient
 
 logger = logging.getLogger(__name__)
+
+# Define GameStatus enum since it's not in common.py
+class GameStatus(Enum):
+    WAITING = "waiting"
+    IN_PROGRESS = "in_progress"
+    FINISHED = "finished"
 
 @dataclass
 class DebateArgument:
@@ -25,10 +32,16 @@ class DebateGame(BaseGame):
     """AI Debate Game Implementation"""
     
     def __init__(self, game_id: str, player1_model: str, player2_model: str):
-        super().__init__(game_id, player1_model, player2_model)
-        self.game_type = "debate"
+        # Initialize LLM clients first
+        self.player1_model = player1_model
+        self.player2_model = player2_model
         
-        # Debate specific state
+        # Call parent class init
+        super().__init__(player1_model, player2_model, use_async=False)
+        
+        # Debate specific attributes
+        self.game_id = game_id
+        self.game_type = "debate"
         self.topic = ""
         self.judge_model = "gpt-4o"  # Hardcoded judge
         self.arguments: List[DebateArgument] = []
@@ -38,8 +51,37 @@ class DebateGame(BaseGame):
         self.judgment = None
         self.debate_finished = False
         self.websocket = None  # Will be set by server
+        self.status = GameStatus.WAITING
         
         logger.info(f"Created debate game {game_id}")
+    
+    def initialize_game(self) -> Dict[str, Any]:
+        """Initialize the game state (required by BaseGame)"""
+        return {
+            "topic": "",
+            "arguments": [],
+            "current_round": 0,
+            "status": GameStatus.WAITING.value
+        }
+    
+    def make_move(self, move: str) -> bool:
+        """Make a move - not used in debate as it's automatic"""
+        return True
+    
+    def check_winner(self) -> Optional[int]:
+        """Check if there's a winner"""
+        if self.judgment and "winner" in self.judgment:
+            return 1 if self.judgment["winner"] == "PRO" else 2
+        return None
+    
+    def get_prompt_for_player(self, player: int) -> str:
+        """Generate prompt for the current player"""
+        position = "PRO" if player == 1 else "CON"
+        return self._build_argument_prompt(position)
+    
+    def is_valid_move(self, move: str) -> bool:
+        """Check if a move is valid - always true for debate"""
+        return True
     
     async def initialize(self, topic: str, judge_model: str = None):
         """Initialize the debate with a topic"""
@@ -103,7 +145,10 @@ class DebateGame(BaseGame):
             
             # Get LLM response
             llm_client = LLMClient(current_model)
-            response = llm_client.get_completion(prompt)
+            response = llm_client.get_response(prompt, max_tokens=150)
+            
+            if not response:
+                raise Exception("Failed to get response from LLM")
             
             # Create argument
             argument = DebateArgument(
@@ -206,7 +251,10 @@ Respond with this JSON format:
             
             # Get judgment
             judge_client = LLMClient(self.judge_model)
-            response = judge_client.get_completion(judge_prompt)
+            response = judge_client.get_response(judge_prompt, max_tokens=500)
+            
+            if not response:
+                raise Exception("Failed to get judgment from LLM")
             
             # Parse JSON
             try:
@@ -274,11 +322,6 @@ Respond with this JSON format:
                 "type": "error",
                 "message": f"Failed to judge debate: {str(e)}"
             })
-    
-    async def handle_player_action(self, action: PlayerAction):
-        """Handle player actions (debates are automatic, so this is minimal)"""
-        # Debates run automatically, no player actions needed
-        pass
     
     def get_state(self) -> Dict[str, Any]:
         """Get current game state"""
