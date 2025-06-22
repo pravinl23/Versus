@@ -109,8 +109,8 @@ class DebateGame(BaseGame):
                 # Generate argument for current position
                 await self.generate_argument()
                 
-                # Small delay between arguments
-                await asyncio.sleep(2)
+                # Wait longer between arguments to allow speech to complete
+                await asyncio.sleep(5)  # Increased from 2 to 5 seconds
                 
                 # Switch positions
                 self.current_position = "CON" if self.current_position == "PRO" else "PRO"
@@ -124,7 +124,7 @@ class DebateGame(BaseGame):
             await self.broadcast_state({"type": "debate_finished"})
             
             # Judge the debate
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
             await self.judge_debate()
             
         except Exception as e:
@@ -145,7 +145,7 @@ class DebateGame(BaseGame):
             
             # Get LLM response
             llm_client = LLMClient(current_model)
-            response = llm_client.get_response(prompt, max_tokens=150)
+            response = llm_client.get_response(prompt, max_tokens=80)
             
             if not response:
                 raise Exception("Failed to get response from LLM")
@@ -182,25 +182,27 @@ class DebateGame(BaseGame):
         # Get previous arguments for context
         context = ""
         if self.arguments:
-            recent_args = self.arguments[-3:]  # Last 3 arguments
+            recent_args = self.arguments[-2:]  # Last 2 arguments
             context = "\n".join([
                 f"{arg.position}: {arg.argument}" 
                 for arg in recent_args
             ])
-            context = f"\n\nRecent arguments:\n{context}\n"
+            context = f"\n\nPrevious exchange:\n{context}\n"
         
-        prompt = f"""You are debating the topic: "{self.topic}"
+        prompt = f"""You are in a live debate about: "{self.topic}"
 
-Your position: You are arguing {position} ({"in favor of" if position == "PRO" else "against"}) this topic.
+Your position: You are arguing {position} ({"in favor of" if position == "PRO" else "against"}).
 {context}
 Instructions:
-- Give a strong, persuasive argument for your position
-- Keep it concise (under 100 words)
-- Be direct and compelling
-- If responding to opponent, address their key points
-- Focus on logic and evidence
+- Speak naturally, like in a real conversation
+- Keep your response SHORT (2-3 sentences max, under 50 words)
+- Be direct and conversational, not formal
+- Use "I think", "Well", "Actually", etc. to sound natural
+- If responding to opponent, acknowledge their point briefly
+- NO bullet points, NO formal structure
+- Speak as if you're talking to someone face-to-face
 
-Your argument:"""
+Your response:"""
         
         return prompt
     

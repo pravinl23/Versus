@@ -116,26 +116,26 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
     }
   };
 
-  // Typewriter effect - shows words as they're spoken
+  // Typewriter effect - shows characters as they're spoken
   const startTypewriterEffect = (fullText, position) => {
-    const words = fullText.split(' ');
-    const speechRate = 1.0;
-    const avgWPM = 150 * speechRate;
-    const msPerWord = (60 / avgWPM) * 1000;
+    const chars = fullText.split('');
+    const speechRate = 0.95; // Match speech rate
+    const charsPerSecond = 15; // Average speaking speed in characters
+    const msPerChar = 1000 / charsPerSecond;
     
     setCurrentlyTyping({ text: '', position, fullText });
     
-    let wordIndex = 0;
+    let charIndex = 0;
     const typeInterval = setInterval(() => {
-      if (wordIndex < words.length) {
-        const displayText = words.slice(0, wordIndex + 1).join(' ');
+      if (charIndex < chars.length) {
+        const displayText = chars.slice(0, charIndex + 1).join('');
         setCurrentlyTyping({ text: displayText, position, fullText });
-        wordIndex++;
+        charIndex++;
       } else {
         clearInterval(typeInterval);
         setCurrentlyTyping(null);
       }
-    }, msPerWord);
+    }, msPerChar);
     
     return () => clearInterval(typeInterval);
   };
@@ -144,105 +144,145 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
   const speakArgument = async (text, position) => {
     console.log(`🎤 Speaking ${position} argument:`, text);
     
-    // Use Vapi if available
-    if (vapiInstance) {
-      try {
-        // Stop any existing call
-        try {
-          vapiInstance.stop();
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (e) {
-          // Ignore if no active call
-        }
-
-        // Vapi configuration
-        const assistant = {
-          voice: {
-            provider: "11labs",
-            voiceId: position === "PRO" ? "pNInz6obpgDQGcFmaJgB" : "21m00Tcm4TlvDq8ikWAM",
-            speed: 1.0,
-            stability: 0.7,
-            similarityBoost: 0.8,
-            style: 0.2,
-            useSpeakerBoost: true
-          },
-          firstMessage: text
-        };
-
-        console.log(`🎭 ${position} using Vapi voice: ${position === "PRO" ? "Elliot" : "Rachel"}`);
-
-        let cleanupTypewriter = null;
-        let speechPromiseResolver = null;
-
-        const speechPromise = new Promise((resolve) => {
-          speechPromiseResolver = resolve;
-        });
-
-        const handleSpeechStart = () => {
-          console.log('🗣️ Vapi started speaking');
-          setIsSpeaking(true);
-          cleanupTypewriter = startTypewriterEffect(text, position);
-        };
-
-        const handleSpeechEnd = () => {
-          console.log('🗣️ Vapi finished speaking');
-          setIsSpeaking(false);
-          if (cleanupTypewriter) cleanupTypewriter();
-          setCurrentlyTyping(null);
-          vapiInstance.off('speech-start', handleSpeechStart);
-          vapiInstance.off('speech-end', handleSpeechEnd);
-          vapiInstance.off('call-end', handleSpeechEnd);
-          if (speechPromiseResolver) speechPromiseResolver();
-        };
-
-        vapiInstance.on('speech-start', handleSpeechStart);
-        vapiInstance.on('speech-end', handleSpeechEnd);
-        vapiInstance.on('call-end', handleSpeechEnd);
-
-        await vapiInstance.start(assistant);
-        await speechPromise;
-        
-        return Promise.resolve();
-        
-      } catch (error) {
-        console.error('❌ Vapi TTS failed:', error);
-        setIsSpeaking(false);
-        setCurrentlyTyping(null);
-      }
+    // Store speech promise to prevent overlapping
+    if (window.currentSpeechPromise) {
+      console.log('⏳ Waiting for previous speech to complete...');
+      await window.currentSpeechPromise;
     }
     
-    // Fallback: Use Web Speech API
-    if ('speechSynthesis' in window) {
-      try {
-        console.log('🔄 Using Web Speech API');
-        
-        window.speechSynthesis.cancel();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        
-        const voices = window.speechSynthesis.getVoices();
-        
-        if (position === "PRO") {
-          const maleVoice = voices.find(voice => 
-            voice.name.toLowerCase().includes('male') ||
-            voice.name.toLowerCase().includes('david') ||
-            voice.name.toLowerCase().includes('daniel')
-          );
-          if (maleVoice) utterance.voice = maleVoice;
-          utterance.pitch = 0.9;
-        } else {
-          const femaleVoice = voices.find(voice => 
-            voice.name.toLowerCase().includes('female') ||
-            voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('victoria')
-          );
-          if (femaleVoice) utterance.voice = femaleVoice;
-          utterance.pitch = 1.1;
+    // Create new speech promise
+    const speechPromise = new Promise(async (resolve) => {
+      // Use Vapi if available
+      if (vapiInstance) {
+        try {
+          // Stop any existing call
+          try {
+            vapiInstance.stop();
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } catch (e) {
+            // Ignore if no active call
+          }
+
+          // Vapi configuration with more natural settings
+          const assistant = {
+            voice: {
+              provider: "11labs",
+              voiceId: position === "PRO" ? "ErXwobaYiN019PkySvjV" : "EXAVITQu4vr4xnSDxMaL", // Antoni for PRO, Bella for CON
+              model: "eleven_turbo_v2",
+              speed: 0.95, // Slightly slower for more natural speech
+              stability: 0.5, // More variation for natural sound
+              similarityBoost: 0.75,
+              style: 0.4, // More expressive
+              useSpeakerBoost: true
+            },
+            model: {
+              provider: "openai",
+              model: "gpt-3.5-turbo",
+              messages: [
+                {
+                  role: "system",
+                  content: "You are a debate assistant. Just repeat exactly what you're told."
+                }
+              ]
+            },
+            firstMessage: text,
+            transcriber: {
+              provider: "deepgram",
+              model: "nova-2",
+              language: "en-US"
+            }
+          };
+
+          console.log(`🎭 ${position} using Vapi voice: ${position === "PRO" ? "Antoni" : "Bella"}`);
+
+          let cleanupTypewriter = null;
+          let speechCompleted = false;
+
+          const handleSpeechStart = () => {
+            console.log('🗣️ Vapi started speaking');
+            setIsSpeaking(true);
+            cleanupTypewriter = startTypewriterEffect(text, position);
+          };
+
+          const handleSpeechEnd = () => {
+            console.log('🗣️ Vapi finished speaking');
+            setIsSpeaking(false);
+            if (cleanupTypewriter) cleanupTypewriter();
+            setCurrentlyTyping(null);
+            speechCompleted = true;
+            
+            // Clean up listeners
+            vapiInstance.off('speech-start', handleSpeechStart);
+            vapiInstance.off('speech-end', handleSpeechEnd);
+            vapiInstance.off('call-end', handleCallEnd);
+            
+            resolve();
+          };
+          
+          const handleCallEnd = () => {
+            if (!speechCompleted) {
+              handleSpeechEnd();
+            }
+          };
+
+          // Add event listeners
+          vapiInstance.on('speech-start', handleSpeechStart);
+          vapiInstance.on('speech-end', handleSpeechEnd);
+          vapiInstance.on('call-end', handleCallEnd);
+
+          // Start the call
+          await vapiInstance.start(assistant);
+          
+          // Add timeout to ensure we don't wait forever
+          setTimeout(() => {
+            if (!speechCompleted) {
+              console.log('⏱️ Speech timeout, moving on...');
+              handleSpeechEnd();
+            }
+          }, 15000); // 15 second timeout
+          
+        } catch (error) {
+          console.error('❌ Vapi TTS failed:', error);
+          setIsSpeaking(false);
+          setCurrentlyTyping(null);
+          resolve();
         }
-        
-        return new Promise((resolve) => {
+      } else {
+        // Fallback: Use Web Speech API
+        try {
+          console.log('🔄 Using Web Speech API');
+          
+          window.speechSynthesis.cancel();
+          await new Promise(r => setTimeout(r, 100));
+          
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 0.9; // Slower for more natural speech
+          utterance.volume = 1.0;
+          
+          const voices = window.speechSynthesis.getVoices();
+          
+          if (position === "PRO") {
+            const maleVoice = voices.find(voice => 
+              voice.name.includes('Daniel') ||
+              voice.name.includes('David') ||
+              voice.name.includes('James') ||
+              voice.name.includes('Male')
+            ) || voices.find(voice => voice.lang.startsWith('en') && !voice.name.includes('Female'));
+            
+            if (maleVoice) utterance.voice = maleVoice;
+            utterance.pitch = 0.85;
+          } else {
+            const femaleVoice = voices.find(voice => 
+              voice.name.includes('Samantha') ||
+              voice.name.includes('Victoria') ||
+              voice.name.includes('Kate') ||
+              voice.name.includes('Female')
+            ) || voices.find(voice => voice.lang.startsWith('en') && voice.name.includes('Female'));
+            
+            if (femaleVoice) utterance.voice = femaleVoice;
+            utterance.pitch = 1.1;
+          }
+          
           let cleanupTypewriter = null;
           
           utterance.onstart = () => {
@@ -265,19 +305,19 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
             resolve();
           };
           
-          if (window.speechSynthesis.getVoices().length === 0) {
-            window.speechSynthesis.addEventListener('voiceschanged', () => {
-              window.speechSynthesis.speak(utterance);
-            }, { once: true });
-          } else {
-            window.speechSynthesis.speak(utterance);
-          }
-        });
-        
-      } catch (error) {
-        console.error('❌ Web Speech API also failed:', error);
+          window.speechSynthesis.speak(utterance);
+          
+        } catch (error) {
+          console.error('❌ Web Speech API failed:', error);
+          resolve();
+        }
       }
-    }
+    });
+    
+    // Store promise globally to prevent overlapping
+    window.currentSpeechPromise = speechPromise;
+    await speechPromise;
+    window.currentSpeechPromise = null;
     
     return Promise.resolve();
   };
@@ -288,14 +328,21 @@ const DebateGame = ({ player1Model, player2Model, onBack }) => {
     if (data.type === 'debate_created') {
       setMessage('Debate started! Generating arguments...');
     } else if (data.type === 'argument_generated') {
+      // Add argument to list
       setDebateArgs(prev => [...prev, data.argument]);
       setCurrentSpeaker(data.argument.position);
       setMessage(`${data.argument.position} is speaking...`);
       
-      // Speak the argument
-      speakArgument(data.argument.argument, data.argument.position).then(() => {
-        setCurrentSpeaker(null);
-      });
+      // Queue speech (don't await here to avoid blocking WebSocket)
+      setTimeout(() => {
+        speakArgument(data.argument.argument, data.argument.position).then(() => {
+          console.log(`✅ Finished speaking ${data.argument.position} argument`);
+          setCurrentSpeaker(null);
+        }).catch(err => {
+          console.error('Speech error:', err);
+          setCurrentSpeaker(null);
+        });
+      }, 500); // Small delay to ensure UI updates first
     } else if (data.type === 'debate_finished') {
       setMessage('Debate finished! Judge is evaluating...');
     } else if (data.type === 'judgment_complete') {
