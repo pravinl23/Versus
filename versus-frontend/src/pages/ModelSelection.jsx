@@ -2,168 +2,85 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Shuffle, CheckCircle, XCircle, Users, Cpu } from "lucide-react"
-import ModelIcon from "../components/ModelIcon"
-import "./ModelSelection.css" // Make sure this path is correct
+import { ChevronLeft, Shuffle, Users, Cpu, Lock } from "lucide-react"
+import "./ModelSelection.css"
+
+// Import company icons
+import openaiIcon from "../assets/openai.png"
+import claudeIcon from "../assets/claude.png"
+import groqIcon from "../assets/groq.png"
+import geminiIcon from "../assets/gemeni.png"
 
 const AI_MODELS_DATA = [
-  // Row 1
-  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", tier: "flagship", iconQuery: "futuristic brain gpt-4o" },
-  { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "OpenAI", tier: "flagship", iconQuery: "circuit brain gpt-4" },
-  { id: "gpt-3.5-turbo", name: "GPT-3.5", provider: "OpenAI", tier: "fast", iconQuery: "simple brain gpt-3.5" },
-  {
-    id: "claude-3-opus",
-    name: "Claude 3 Opus",
-    provider: "Anthropic",
-    tier: "flagship",
-    iconQuery: "elegant brain claude opus",
-  },
-  {
-    id: "claude-3-sonnet",
-    name: "Claude 3 Sonnet",
-    provider: "Anthropic",
-    tier: "balanced",
-    iconQuery: "poetic brain claude sonnet",
-  },
-  {
-    id: "claude-3-haiku",
-    name: "Claude 3 Haiku",
-    provider: "Anthropic",
-    tier: "fast",
-    iconQuery: "minimalist brain claude haiku",
-  },
-  {
-    id: "gemini-1.5-pro",
-    name: "Gemini 1.5 Pro",
-    provider: "Google",
-    tier: "flagship",
-    iconQuery: "twin brain gemini pro",
-  },
-  {
-    id: "gemini-1.5-flash",
-    name: "Gemini 1.5 Flash",
-    provider: "Google",
-    tier: "fast",
-    iconQuery: "spark brain gemini flash",
-  },
-
-  // Row 2
-  { id: "llama-3-70b", name: "Llama 3 70B", provider: "Meta", tier: "open", iconQuery: "llama face ai meta 70b" },
-  { id: "llama-3-8b", name: "Llama 3 8B", provider: "Meta", tier: "open", iconQuery: "small llama face ai meta 8b" },
-  {
-    id: "mixtral-8x22b",
-    name: "Mixtral 8x22B",
-    provider: "Mistral",
-    tier: "open",
-    iconQuery: "wind brain mistral 8x22b",
-  },
-  {
-    id: "mistral-large",
-    name: "Mistral Large",
-    provider: "Mistral",
-    tier: "flagship",
-    iconQuery: "strong wind brain mistral large",
-  },
-  {
-    id: "command-r-plus",
-    name: "Command R+",
-    provider: "Cohere",
-    tier: "flagship",
-    iconQuery: "commander brain cohere r plus",
-  },
-  { id: "command-r", name: "Command R", provider: "Cohere", tier: "balanced", iconQuery: "officer brain cohere r" },
-  {
-    id: "jamba-instruct",
-    name: "Jamba Instruct",
-    provider: "AI21",
-    tier: "specialized",
-    iconQuery: "musical brain ai21 jamba",
-  },
-  { id: "gemma-7b", name: "Gemma 7B", provider: "Google", tier: "open", iconQuery: "gemstone brain google gemma" },
-
-  // Row 3
-  {
-    id: "phi-3-medium",
-    name: "Phi-3 Medium",
-    provider: "Microsoft",
-    tier: "balanced",
-    iconQuery: "phi symbol brain microsoft medium",
-  },
-  {
-    id: "phi-3-mini",
-    name: "Phi-3 Mini",
-    provider: "Microsoft",
-    tier: "fast",
-    iconQuery: "small phi symbol brain microsoft mini",
-  },
-  {
-    id: "qwen1.5-72b-chat",
-    name: "Qwen1.5 72B",
-    provider: "Alibaba",
-    tier: "open",
-    iconQuery: "dragon brain alibaba qwen 72b",
-  },
-  { id: "yi-34b-chat", name: "Yi 34B Chat", provider: "01.AI", tier: "open", iconQuery: "number one brain 01.ai yi" },
-  {
-    id: "deepseek-coder-33b",
-    name: "DS Coder 33B",
-    provider: "DeepSeek",
-    tier: "specialized",
-    iconQuery: "code brain deepseek coder",
-  },
-  {
-    id: "wizardlm-2-8x22b",
-    name: "WizardLM 2",
-    provider: "Microsoft",
-    tier: "open",
-    iconQuery: "wizard hat brain microsoft wizardlm",
-  },
-  { id: "grok-1", name: "Grok-1", provider: "xAI", tier: "flagship", iconQuery: "cosmic brain xai grok" },
-  {
-    id: "dbrx-instruct",
-    name: "DBRX Instruct",
-    provider: "Databricks",
-    tier: "open",
-    iconQuery: "data bricks brain databricks dbrx",
-  },
-  { id: "random", name: "RANDOM", provider: "???", tier: "special", isRandom: true, iconQuery: "question mark random" },
+  // OpenAI Models (Currently Available)
+  { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", tier: "flagship", icon: openaiIcon },
+  { id: "gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", tier: "fast", icon: openaiIcon },
+  { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "OpenAI", tier: "balanced", icon: openaiIcon },
+  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "OpenAI", tier: "fast", icon: openaiIcon },
+  
+  // Claude Models (Currently Available)
+  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "Anthropic", tier: "flagship", icon: claudeIcon },
+  { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", provider: "Anthropic", tier: "fast", icon: claudeIcon },
+  
+  // Gemini Models (Currently Available)
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "Google", tier: "balanced", icon: geminiIcon },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "Google", tier: "fast", icon: geminiIcon },
+  
+  // Groq Models (Currently Available)
+  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", provider: "Groq", tier: "fast", icon: groqIcon },
+  { id: "llama-3.1-70b-versatile", name: "Llama 3.1 70B", provider: "Groq", tier: "balanced", icon: groqIcon },
+  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", provider: "Groq", tier: "fast", icon: groqIcon },
+  
+  // Random option
+  { id: "random", name: "RANDOM", provider: "???", tier: "special", isRandom: true },
 ]
 
 const ModelCard = ({ model, onSelect, isSelectedP1, isSelectedP2, isHovered, onMouseEnter, onMouseLeave }) => {
   let borderClass = "border-slate-700"
-  if (isSelectedP1 && isSelectedP2) {
+  if (model.locked) {
+    borderClass = "border-slate-800 opacity-50 cursor-not-allowed"
+  } else if (isSelectedP1 && isSelectedP2) {
     borderClass = "border-yellow-400 ring-4 ring-yellow-400"
   } else if (isSelectedP1) {
     borderClass = "border-red-500 ring-4 ring-red-500"
   } else if (isSelectedP2) {
     borderClass = "border-blue-500 ring-4 ring-blue-500"
-  } else if (isHovered) {
+  } else if (isHovered && !model.locked) {
     borderClass = "border-slate-500 scale-105"
+  }
+
+  const handleClick = () => {
+    if (!model.locked) {
+      onSelect()
+    }
   }
 
   return (
     <div
-      className={`model-card ${borderClass} ${isHovered ? "hovered" : ""}`}
-      onClick={onSelect}
+      className={`model-card ${borderClass} ${model.locked ? 'locked' : ''} ${isHovered && !model.locked ? 'hovered' : ''}`}
+      onClick={handleClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
+      {/* Player tags */}
+      <div className="player-tags-container">
+        {isSelectedP1 && <div className="player-tag p1-tag">P1</div>}
+        {isSelectedP2 && <div className="player-tag p2-tag">P2</div>}
+      </div>
+
+      {/* Model Icon/Image */}
       <div className="model-image-container">
         {model.isRandom ? (
-          <Shuffle className="h-16 w-16 text-yellow-400" />
-        ) : (
-          <ModelIcon model={model} size="normal" />
-        )}
+          <Shuffle className="shuffle-icon" />
+        ) : model.icon ? (
+          <img src={model.icon} alt={model.provider} className="model-icon-normal" />
+        ) : null}
       </div>
+
+      {/* Model Name */}
       <div className="model-name-banner">
         <span className="model-name-text">{model.name}</span>
       </div>
-      {(isSelectedP1 || isSelectedP2) && (
-        <div className="player-tags-container">
-          {isSelectedP1 && <div className="player-tag p1-tag">P1</div>}
-          {isSelectedP2 && <div className="player-tag p2-tag">P2</div>}
-        </div>
-      )}
     </div>
   )
 }
@@ -204,8 +121,28 @@ const ModelSelection = () => {
 
   const handleProceed = () => {
     if (player1Model && player2Model) {
-      sessionStorage.setItem("player1Model", JSON.stringify(player1Model))
-      sessionStorage.setItem("player2Model", JSON.stringify(player2Model))
+      // Handle random model selection
+      let finalPlayer1 = player1Model;
+      let finalPlayer2 = player2Model;
+      
+      // Get list of non-random models
+      const availableModels = AI_MODELS_DATA.filter(m => !m.isRandom && !m.locked);
+      
+      if (player1Model.isRandom) {
+        finalPlayer1 = availableModels[Math.floor(Math.random() * availableModels.length)];
+      }
+      
+      if (player2Model.isRandom) {
+        // Make sure we don't pick the same model if player1 was also random
+        let remainingModels = availableModels;
+        if (player1Model.isRandom && finalPlayer1) {
+          remainingModels = availableModels.filter(m => m.id !== finalPlayer1.id);
+        }
+        finalPlayer2 = remainingModels[Math.floor(Math.random() * remainingModels.length)];
+      }
+      
+      sessionStorage.setItem("player1Model", JSON.stringify(finalPlayer1))
+      sessionStorage.setItem("player2Model", JSON.stringify(finalPlayer2))
       navigate("/games") // Navigate to your game selection or actual game page
     }
   }
@@ -250,43 +187,48 @@ const ModelSelection = () => {
           <div className="player-info-card p1-card">
             <div className="player-tag-large p1-bg">P1</div>
             <div className="selected-model-name">{getPlayerDisplayName(player1Model)}</div>
-            {player1Model && !player1Model.isRandom && (
+            {player1Model && (
               <div className="selected-model-portrait">
-                <ModelIcon model={player1Model} size="large" />
+                {player1Model.isRandom ? (
+                  <Shuffle className="shuffle-icon" />
+                ) : player1Model.icon ? (
+                  <img src={player1Model.icon} alt={player1Model.provider} />
+                ) : null}
               </div>
             )}
-            {player1Model && player1Model.isRandom && <Shuffle className="h-24 w-24 text-slate-300 my-auto" />}
-            {!player1Model && <Users className="h-24 w-24 text-slate-500 my-auto" />}
           </div>
         </div>
-
-        <div className="vs-separator">VS</div>
-
+        <div className="vs-separator">
+          <span className="vs-text">VS</span>
+        </div>
         <div className="player-display player-two">
           <div className="player-info-card p2-card">
             <div className="player-tag-large p2-bg">P2</div>
             <div className="selected-model-name">{getPlayerDisplayName(player2Model)}</div>
-            {player2Model && !player2Model.isRandom && (
+            {player2Model && (
               <div className="selected-model-portrait">
-                <ModelIcon model={player2Model} size="large" />
+                {player2Model.isRandom ? (
+                  <Shuffle className="shuffle-icon" />
+                ) : player2Model.icon ? (
+                  <img src={player2Model.icon} alt={player2Model.provider} />
+                ) : null}
               </div>
             )}
-            {player2Model && player2Model.isRandom && <Shuffle className="h-24 w-24 text-slate-300 my-auto" />}
-            {!player2Model && <Cpu className="h-24 w-24 text-slate-500 my-auto" />}
           </div>
         </div>
       </footer>
 
+      {/* Actions Bar */}
       <div className="smash-actions-bar">
-        <button onClick={handleReset} className="smash-action-button reset-button">
-          <XCircle size={20} className="mr-2" /> RESET
+        <button className="smash-action-button reset-button" onClick={handleReset}>
+          RESET
         </button>
         <button
+          className="smash-action-button proceed-button"
           onClick={handleProceed}
           disabled={!player1Model || !player2Model}
-          className="smash-action-button proceed-button"
         >
-          START BATTLE <CheckCircle size={20} className="ml-2" />
+          START BATTLE
         </button>
       </div>
     </div>

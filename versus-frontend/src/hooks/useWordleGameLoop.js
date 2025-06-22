@@ -1,18 +1,17 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+
+const BACKEND_URL = 'http://localhost:5002'
 
 export const useGameLoop = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   
-  const API_BASE = 'http://localhost:8000/api/wordle'
-  
-  const startGame = async (secretWord) => {
+  const startGame = useCallback(async (secretWord) => {
+    setIsLoading(true)
+    setError(null)
+    
     try {
-      console.log('Starting game with API call to:', `${API_BASE}/start`)
-      setIsLoading(true)
-      setError(null)
-      
-      const response = await fetch(`${API_BASE}/start`, {
+      const response = await fetch(`${BACKEND_URL}/api/wordle/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -20,33 +19,23 @@ export const useGameLoop = () => {
         body: JSON.stringify({ secret_word: secretWord }),
       })
       
-      console.log('Response status:', response.status)
-      
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error response:', errorText)
-        throw new Error(`Failed to start game: ${response.status} ${errorText}`)
+        throw new Error('Failed to start game')
       }
       
       const data = await response.json()
-      console.log('Game started successfully:', data)
-      return data
+      return data.success
     } catch (err) {
-      console.error('Failed to start game:', err)
       setError(err.message)
-      return null
+      return false
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
   
-  const getNextMove = async (model) => {
+  const getNextMove = useCallback(async (model) => {
     try {
-      console.log('Getting next move for model:', model)
-      setIsLoading(true)
-      setError(null)
-      
-      const response = await fetch(`${API_BASE}/guess`, {
+      const response = await fetch(`${BACKEND_URL}/api/wordle/guess`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,25 +43,17 @@ export const useGameLoop = () => {
         body: JSON.stringify({ model }),
       })
       
-      console.log('Guess response status:', response.status)
-      
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error getting move:', errorText)
-        throw new Error(`Failed to get move: ${response.status} ${errorText}`)
+        throw new Error('Failed to get move')
       }
       
       const data = await response.json()
-      console.log('Got move:', data)
       return data
     } catch (err) {
-      console.error('Failed to get next move:', err)
-      setError(err.message)
+      console.error('Error getting move:', err)
       return null
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [])
   
   return {
     startGame,

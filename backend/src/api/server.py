@@ -14,6 +14,8 @@ import uuid
 import random
 import sys
 import os
+from datetime import datetime
+import re
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -55,8 +57,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store active games and sessions
-active_games: Dict[str, Dict] = {}
+# Store active games
+active_games = {}
+battleship_games = {}  # Add this to store battleship games
 trivia_sessions: Dict[str, Dict] = {}
 wordle_games: Dict[str, WordleSimpleGame] = {}
 connections_games: Dict[str, ConnectionsGame] = {}
@@ -103,30 +106,39 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
             data = await websocket.receive_json()
             
             if data.get("type") == "start_game":
-                # Map model IDs to backend format (same function as trivia uses)
-                def map_model_to_backend(model_id):
-                    if not model_id:
-                        return "openai"  # default fallback
-                    model_id = model_id.lower()
-                    if "gpt" in model_id or "openai" in model_id:
-                        return "openai"
-                    elif "claude" in model_id or "anthropic" in model_id:
-                        return "anthropic"
-                    elif "gemini" in model_id or "google" in model_id:
-                        return "gemini"
-                    elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
-                        return "groq"
-                    else:
-                        return "openai"  # default fallback
+                # Check if game already exists
+                if game_id in battleship_games:
+                    game = battleship_games[game_id]
+                    print(f"Game {game_id} already exists, sending current state")
+                    
+                    # Send current game state
+                    await websocket.send_json({
+                        "type": "game_state",
+                        "status": game.status,
+                        "message": "Game already in progress",
+                        "currentPlayer": game.current_player,
+                        "player1Shots": game.game_state["player1_shots"],
+                        "player2Shots": game.game_state["player2_shots"],
+                        "player1Board": game.game_state["player1_board"],
+                        "player2Board": game.game_state["player2_board"],
+                        "shipsPlaced": game.ships_placed,
+                        "winner": game.winner
+                    })
+                    
+                    # If game is active, continue the game loop
+                    if game.status == "active" and not game.winner:
+                        asyncio.create_task(continue_battleship_game(game, websocket, game_id))
+                    continue
                 
-                player1_model = map_model_to_backend(data.get("player1Model"))
-                player2_model = map_model_to_backend(data.get("player2Model"))
+                # Create new game
+                player1_model = data.get("player1Model", "gpt-4o-mini")
+                player2_model = data.get("player2Model", "claude-3-haiku")
                 
-                print(f"Received models: {data.get('player1Model')} -> {player1_model}, {data.get('player2Model')} -> {player2_model}")
-                print(f"Starting battleship game with models: {player1_model} vs {player2_model}")
+                print(f"Creating new battleship game {game_id} with models: {player1_model} vs {player2_model}")
                 
-                # Create and run the battleship game
+                # Create and store the battleship game
                 game = BattleshipGame(player1_model, player2_model)
+                battleship_games[game_id] = game
                 
                 # Send initial game state
                 await websocket.send_json({
@@ -147,39 +159,19 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
                         "message": f"Player {player} is placing ships..."
                     })
                     
-                    for ship_name, ship_size in game.ships.items():
-                        placed = False
-                        attempts = 0
-                        
-                        while not placed and attempts < 100:
-                            row = random.randint(0, game.board_size - 1)
-                            col = random.randint(0, game.board_size - 1)
-                            orientation = random.choice(['horizontal', 'vertical'])
-                            
-                            if game._can_place_ship(game.game_state[f'player{player}_board'], row, col, ship_size, orientation):
-                                game.place_ship(player, {
-                                    'id': ship_name,
-                                    'size': ship_size,
-                                    'row': row,
-                                    'col': col,
-                                    'orientation': orientation
-                                })
-                                
-                                await websocket.send_json({
-                                    "type": "ship_placed",
-                                    "player": player,
-                                    "ship": ship_name,
-                                    "size": ship_size,
-                                    "position": {"row": row, "col": col},
-                                    "orientation": orientation,
-                                    "board": game.game_state[f'player{player}_board']
-                                })
-                                
-                                await asyncio.sleep(0.1)
-                                placed = True
-                            
-                            attempts += 1
+                    # Place all ships for this player
+                    game.place_ships_for_player(player)
+                    
+                    # Send the complete board after all ships are placed
+                    await websocket.send_json({
+                        "type": "ship_placed",
+                        "player": player,
+                        "board": game.game_state[f'player{player}_board']
+                    })
+                    
+                    await asyncio.sleep(0.2)
                 
+                # Send placement complete
                 await websocket.send_json({
                     "type": "placement_complete",
                     "message": "All ships placed! Game starting...",
@@ -189,77 +181,187 @@ async def battleship_websocket(websocket: WebSocket, game_id: str):
                 
                 await asyncio.sleep(0.5)
                 
-                # Game loop
+                # Start game loop
                 game.status = "active"
-                while game.status == "active" and not game.winner:
-                    current_player = game.current_player
-                    max_retries = 5
-                    retry_count = 0
-                    
-                    while retry_count < max_retries:
-                        prompt = game.get_prompt_for_player(current_player)
-                        
-                        if current_player == 1:
-                            move_response = game.player1.get_move(prompt, game.game_state)
-                        else:
-                            move_response = game.player2.get_move(prompt, game.game_state)
-                        
-                        try:
-                            move_str = move_response.strip()
-                            
-                            if len(move_str) >= 2 and move_str[0].isalpha() and move_str[1].isdigit():
-                                col_letter = move_str[0].upper()
-                                row_num = int(move_str[1:])
-                                col_idx = ord(col_letter) - ord('A')
-                                row_idx = row_num - 1
-                            else:
-                                move = json.loads(move_response)
-                                if 'col' in move and 'row' in move:
-                                    col_idx = ord(move['col'].upper()) - ord('A')
-                                    row_idx = move['row'] - 1
-                                else:
-                                    raise ValueError("Invalid move format")
-                            
-                            move_result = game.make_move(row_idx, col_idx)
-                            
-                            if move_result["success"]:
-                                col_letter = chr(col_idx + ord('A'))
-                                await websocket.send_json({
-                                    "type": "game_state",
-                                    "currentPlayer": game.current_player,
-                                    "player1Shots": game.game_state["player1_shots"],
-                                    "player2Shots": game.game_state["player2_shots"],
-                                    "lastMove": f"{col_letter}{row_idx + 1}",
-                                    "lastResult": move_result["result"],
-                                    "message": f"Player {3 - game.current_player} fired at {col_letter}{row_idx + 1} - {move_result['result'].upper()}!",
-                                    "status": "finished" if game.winner else "in_progress",
-                                    "winner": game.winner
-                                })
-                                
-                                if game.winner:
-                                    game.status = "finished"
-                                    await websocket.send_json({
-                                        "type": "game_over",
-                                        "winner": game.winner,
-                                        "message": f"🎉 Player {game.winner} wins!"
-                                    })
-                                    break
-                                
-                                await asyncio.sleep(0.3)
-                                break
-                            else:
-                                print(f"Invalid move from player {current_player}: {move_result.get('result', 'unknown error')}")
-                                retry_count += 1
-                                
-                        except Exception as e:
-                            print(f"Error processing move: {e}")
-                            retry_count += 1
-                            continue
+                asyncio.create_task(run_battleship_game_loop(game, websocket, game_id))
+            
+            elif data.get("type") == "get_state":
+                # Handle request for current game state
+                if game_id in battleship_games:
+                    game = battleship_games[game_id]
+                    await websocket.send_json({
+                        "type": "game_state",
+                        "status": game.status,
+                        "currentPlayer": game.current_player,
+                        "player1Shots": game.game_state["player1_shots"],
+                        "player2Shots": game.game_state["player2_shots"],
+                        "player1Board": game.game_state["player1_board"],
+                        "player2Board": game.game_state["player2_board"],
+                        "winner": game.winner,
+                        "message": "Current game state"
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Game not found"
+                    })
             
     except WebSocketDisconnect:
         print(f"Client disconnected from battleship game {game_id}")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        print(f"WebSocket error in game {game_id}: {e}")
+        import traceback
+        traceback.print_exc()
+
+async def continue_battleship_game(game: BattleshipGame, websocket: WebSocket, game_id: str):
+    """Continue an existing battleship game"""
+    try:
+        # Send current state first
+        await websocket.send_json({
+            "type": "game_state",
+            "status": game.status,
+            "currentPlayer": game.current_player,
+            "player1Shots": game.game_state["player1_shots"],
+            "player2Shots": game.game_state["player2_shots"],
+            "winner": game.winner,
+            "message": "Continuing game..."
+        })
+        
+        # Continue the game loop
+        await run_battleship_game_loop(game, websocket, game_id)
+    except Exception as e:
+        print(f"Error continuing game {game_id}: {e}")
+
+async def run_battleship_game_loop(game: BattleshipGame, websocket: WebSocket, game_id: str):
+    """Run the battleship game loop in a separate task"""
+    try:
+        while game.status == "active" and not game.winner:
+            current_player = game.current_player
+            max_retries = 5
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                # Generate a fresh prompt for each retry
+                prompt = game.get_prompt_for_player(current_player)
+                
+                if current_player == 1:
+                    move_response = game.player1.get_move(prompt, game.game_state)
+                else:
+                    move_response = game.player2.get_move(prompt, game.game_state)
+                
+                try:
+                    # Clean up the response
+                    move_str = move_response.strip().upper()
+                    
+                    # Remove any extra text, just get the first word
+                    move_str = move_str.split()[0] if move_str else ""
+                    
+                    # Try to parse the move
+                    # Look for pattern like A5, H8, etc.
+                    coord_match = re.search(r'[A-H][1-8]', move_str)
+                    
+                    if coord_match:
+                        coord = coord_match.group(0)
+                        col_letter = coord[0]
+                        row_num = int(coord[1])
+                        col_idx = ord(col_letter) - ord('A')
+                        row_idx = row_num - 1
+                    else:
+                        raise ValueError(f"Could not parse move: {move_response}")
+                    
+                    # Validate bounds
+                    if not (0 <= row_idx < game.board_size and 0 <= col_idx < game.board_size):
+                        raise ValueError(f"Move out of bounds: row={row_idx}, col={col_idx}")
+                    
+                    move_result = game.make_move(row_idx, col_idx)
+                    
+                    if move_result["success"]:
+                        col_letter = chr(col_idx + ord('A'))
+                        await websocket.send_json({
+                            "type": "game_state",
+                            "currentPlayer": game.current_player,
+                            "player1Shots": game.game_state["player1_shots"],
+                            "player2Shots": game.game_state["player2_shots"],
+                            "lastMove": f"{col_letter}{row_idx + 1}",
+                            "lastResult": move_result["result"],
+                            "message": f"Player {3 - game.current_player} fired at {col_letter}{row_idx + 1} - {move_result['result'].upper()}!",
+                            "status": "finished" if game.winner else "in_progress",
+                            "winner": game.winner
+                        })
+                        
+                        if game.winner:
+                            game.status = "finished"
+                            await websocket.send_json({
+                                "type": "game_over",
+                                "winner": game.winner,
+                                "message": f"🎉 Player {game.winner} wins!"
+                            })
+                            # Remove the game after it's finished
+                            if game_id in battleship_games:
+                                del battleship_games[game_id]
+                            break
+                        
+                        await asyncio.sleep(0.3)
+                        break
+                    else:
+                        print(f"Invalid move from player {current_player}: {move_result.get('reason', move_result.get('result', 'unknown error'))}")
+                        retry_count += 1
+                        await asyncio.sleep(0.5)
+                        
+                except Exception as e:
+                    print(f"Error processing move from player {current_player}: {e}")
+                    print(f"Raw response was: {move_response}")
+                    retry_count += 1
+                    await asyncio.sleep(0.5)
+                    continue
+            
+            # If we exhausted all retries, try a random valid move
+            if retry_count >= max_retries:
+                print(f"Player {current_player} failed to make a valid move after {max_retries} attempts")
+                # Find a random available position
+                available_positions = []
+                shots = game.game_state[f'player{current_player}_shots']
+                for i in range(game.board_size):
+                    for j in range(game.board_size):
+                        if shots[i][j] is None:
+                            available_positions.append((i, j))
+                
+                if available_positions:
+                    row_idx, col_idx = random.choice(available_positions)
+                    move_result = game.make_move(row_idx, col_idx)
+                    
+                    if move_result["success"]:
+                        col_letter = chr(col_idx + ord('A'))
+                        await websocket.send_json({
+                            "type": "game_state",
+                            "currentPlayer": game.current_player,
+                            "player1Shots": game.game_state["player1_shots"],
+                            "player2Shots": game.game_state["player2_shots"],
+                            "lastMove": f"{col_letter}{row_idx + 1}",
+                            "lastResult": move_result["result"],
+                            "message": f"Player {3 - game.current_player} fired at {col_letter}{row_idx + 1} - {move_result['result'].upper()}! (random fallback)",
+                            "status": "finished" if game.winner else "in_progress",
+                            "winner": game.winner
+                        })
+                        
+                        if game.winner:
+                            game.status = "finished"
+                            await websocket.send_json({
+                                "type": "game_over",
+                                "winner": game.winner,
+                                "message": f"🎉 Player {game.winner} wins!"
+                            })
+                            # Remove the game after it's finished
+                            if game_id in battleship_games:
+                                del battleship_games[game_id]
+                else:
+                    print(f"No available positions for player {current_player}")
+                    break
+                    
+    except Exception as e:
+        print(f"Error in game loop for {game_id}: {e}")
+        import traceback
+        traceback.print_exc()
 
 # =================
 # TRIVIA ENDPOINTS
@@ -277,30 +379,15 @@ async def start_trivia_game(request: GameStartRequest):
         game_id = str(uuid.uuid4())
         questions = get_random_questions(request.question_count)
         
-        # Map model IDs to backend format
-        def map_model_to_backend(model_id):
-            if not model_id:
-                return "openai"  # default fallback
-            model_id = model_id.lower()
-            if "gpt" in model_id or "openai" in model_id:
-                return "openai"
-            elif "claude" in model_id or "anthropic" in model_id:
-                return "anthropic"
-            elif "gemini" in model_id or "google" in model_id:
-                return "gemini"
-            elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
-                return "groq"
-            else:
-                return "openai"  # default fallback
+        # Use model IDs directly
+        player1_model = request.player1_model or "gpt-4o-mini"
+        player2_model = request.player2_model or "claude-3-haiku"
         
-        player1_backend = map_model_to_backend(request.player1_model)
-        player2_backend = map_model_to_backend(request.player2_model)
-        
-        print(f"Starting trivia game with models: {request.player1_model} ({player1_backend}) vs {request.player2_model} ({player2_backend})")
+        print(f"Starting trivia game with models: {player1_model} vs {player2_model}")
         
         trivia_game = TriviaGame(
-            player1_model=player1_backend,
-            player2_model=player2_backend,
+            player1_model=player1_model,
+            player2_model=player2_model,
             questions=questions
         )
         
@@ -313,8 +400,8 @@ async def start_trivia_game(request: GameStartRequest):
             "game_id": game_id,
             "status": "started",
             "total_questions": len(questions),
-            "player1_model": request.player1_model or "openai",
-            "player2_model": request.player2_model or "anthropic"
+            "player1_model": player1_model,
+            "player2_model": player2_model
         }
         
     except Exception as e:
@@ -476,6 +563,16 @@ async def make_wordle_guess(game_id: str, request: dict):
         reasoning = f"API error - using fallback word: {guess}"
     
     result = game.make_guess(model, guess, reasoning)
+    
+    # Check if the game is already over
+    if "error" in result:
+        # Game is already over, return appropriate response
+        return {
+            "error": result["error"],
+            "game_over": True,
+            "winner": game.winner
+        }
+    
     detailed_reasoning = parse_reasoning_for_ui(model, reasoning, model_data['guesses'], model_data['feedback'])
     
     return {
@@ -509,6 +606,16 @@ async def make_wordle_guess_no_id(request: dict):
         reasoning = f"API error - using fallback word: {guess}"
     
     result = current_wordle_game.make_guess(model, guess, reasoning)
+    
+    # Check if the game is already over
+    if "error" in result:
+        # Game is already over, return appropriate response
+        return {
+            "error": result["error"],
+            "game_over": True,
+            "winner": current_wordle_game.winner
+        }
+    
     detailed_reasoning = parse_reasoning_for_ui(model, reasoning, model_data['guesses'], model_data['feedback'])
     
     return {
@@ -534,34 +641,20 @@ async def start_connections_game(request: ConnectionsStartRequest):
     try:
         game_id = str(uuid.uuid4())
         
-        # Map model IDs to backend format
-        def map_model_to_backend(model_id):
-            if not model_id:
-                return "openai"  # default fallback
-            model_id = model_id.lower()
-            if "gpt" in model_id or "openai" in model_id:
-                return "openai"
-            elif "claude" in model_id or "anthropic" in model_id:
-                return "anthropic"
-            elif "gemini" in model_id or "google" in model_id:
-                return "gemini"
-            elif "groq" in model_id or "mixtral" in model_id or "llama" in model_id:
-                return "groq"
-            else:
-                return "openai"  # default fallback
+        # Use model IDs directly
+        player1_model = request.player1_model or "gpt-4o-mini"
+        player2_model = request.player2_model or "claude-3-haiku"
         
         # Create two separate games with the same puzzle
         game1 = ConnectionsGame()
         game2 = ConnectionsGame(puzzle_data=game1.puzzle)  # Use same puzzle
         
-        # Store games with model mapping
+        # Store games with model info
         connections_games[game_id] = {
             "player1_game": game1,
             "player2_game": game2,
-            "player1_model": request.player1_model,
-            "player2_model": request.player2_model,
-            "player1_backend": map_model_to_backend(request.player1_model),
-            "player2_backend": map_model_to_backend(request.player2_model)
+            "player1_model": player1_model,
+            "player2_model": player2_model
         }
         
         return {
@@ -570,8 +663,8 @@ async def start_connections_game(request: ConnectionsStartRequest):
             "puzzle_id": game1.id,
             "date": game1.date,
             "words": game1.all_words,
-            "player1_model": request.player1_model,
-            "player2_model": request.player2_model
+            "player1_model": player1_model,
+            "player2_model": player2_model
         }
         
     except Exception as e:
@@ -593,44 +686,50 @@ async def connections_websocket(websocket: WebSocket, game_id: str):
     except WebSocketDisconnect:
         manager.disconnect(websocket, game_id)
 
-@app.post("/api/connections/game/{game_id}/player/{player:int}/ai-turn")
-async def connections_ai_turn(game_id: str, player: int, request: dict):
+@app.post("/api/connections/game/{game_id}/player/{player}/ai-turn")
+async def connections_ai_turn(game_id: str, player: str, request: dict):
     """Process an AI turn for NYT Connections"""
+    # Convert player to int
+    try:
+        player_num = int(player)
+        if player_num not in [1, 2]:
+            raise ValueError("Player must be 1 or 2")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Player must be 1 or 2")
+    
     if game_id not in connections_games:
         raise HTTPException(status_code=404, detail="Game not found")
     
     session = connections_games[game_id]
     
     # Get the appropriate game and model for this player
-    if player == 1:
+    if player_num == 1:
         game = session["player1_game"]
-        backend_model = session["player1_backend"]
-        display_model = session["player1_model"]
+        model_id = session["player1_model"]
     else:
         game = session["player2_game"]
-        backend_model = session["player2_backend"]
-        display_model = session["player2_model"]
+        model_id = session["player2_model"]
     
     if game.game_over:
         return {"error": "Game is already over"}
     
     try:
-        # Get AI guess
-        guess = game.get_ai_guess(backend_model)
+        # Get AI guess using the model ID
+        guess = game.get_ai_guess(model_id)
         
         if not guess:
             return {"error": "Failed to get AI guess"}
         
         # Make the guess
-        result = game.make_guess(display_model, guess)
+        result = game.make_guess(model_id, guess)
         
         # Broadcast update
         await manager.broadcast_to_game(
             json.dumps({
                 "type": "game_update",
                 "data": {
-                    "player": player,
-                    "model": display_model,
+                    "player": player_num,
+                    "model": model_id,
                     "guess": guess,
                     "result": result,
                     "game_state": game.get_game_state()
@@ -640,8 +739,8 @@ async def connections_ai_turn(game_id: str, player: int, request: dict):
         )
         
         return {
-            "player": player,
-            "model": display_model,
+            "player": player_num,
+            "model": model_id,
             "guess": guess,
             "result": result,
             "game_state": game.get_game_state()

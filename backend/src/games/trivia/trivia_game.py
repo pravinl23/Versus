@@ -204,16 +204,27 @@ class TriviaGame(BaseGame):
         """Query a specific model based on its type"""
         try:
             if model.model_type == "OPENAI":
-                response = await model.client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=50,
-                    temperature=0.1
-                )
-                return response.choices[0].message.content.strip()
+                # Use asyncio.to_thread to run sync method in thread pool
+                import asyncio
+                def openai_call():
+                    try:
+                        response = model.client.chat.completions.create(
+                            model="gpt-4o-mini",  # Use faster model
+                            messages=[
+                                {"role": "system", "content": "You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            max_tokens=50,
+                            temperature=0.1
+                        )
+                        return response.choices[0].message.content.strip()
+                    except Exception as e:
+                        import traceback
+                        print(f"OpenAI call error: {e}")
+                        traceback.print_exc()
+                        return f"OpenAI Error: {str(e)}"
+                
+                return await asyncio.to_thread(openai_call)
             
             elif model.model_type == "ANTHROPIC":
                 import asyncio
@@ -249,28 +260,41 @@ class TriviaGame(BaseGame):
                 return response_text.strip()
             
             elif model.model_type == "GEMINI":
-                model_instance = model.client.GenerativeModel('gemini-pro')
-                response = await model_instance.generate_content_async(
-                    f"System: You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning.\n\nUser: {prompt}"
-                )
-                return response.text.strip()
+                # Use asyncio.to_thread for sync Gemini client
+                import asyncio
+                def gemini_call():
+                    model_instance = model.client
+                    response = model_instance.generate_content(
+                        f"System: You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning.\n\nUser: {prompt}"
+                    )
+                    return response.text.strip()
+                
+                return await asyncio.to_thread(gemini_call)
             
             elif model.model_type == "GROQ":
-                response = await model.client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": "You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    model="mixtral-8x7b-32768",
-                    max_tokens=50,
-                    temperature=0.1
-                )
-                return response.choices[0].message.content.strip()
+                # Use asyncio.to_thread for sync Groq client
+                import asyncio
+                def groq_call():
+                    response = model.client.chat.completions.create(
+                        messages=[
+                            {"role": "system", "content": "You are competing in a trivia contest. Give short, direct answers only. Do not explain your reasoning."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        model="mixtral-8x7b-32768",
+                        max_tokens=50,
+                        temperature=0.1
+                    )
+                    return response.choices[0].message.content.strip()
+                
+                return await asyncio.to_thread(groq_call)
             
             else:
                 return "Unsupported model type"
                 
         except Exception as e:
+            import traceback
+            print(f"_query_model error for {model.model_type}: {e}")
+            traceback.print_exc()
             return f"API Error: {str(e)}"
     
     def _format_question_prompt(self, question: Dict[str, Any], wrong_answers: Set[str] = None) -> str:

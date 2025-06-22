@@ -2,10 +2,12 @@
   min-height: 100vh;
   background-color: #000;
   color: #fff;
-  padding: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 10px;
+  font-family: 'VT323', monospace;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  overflow: hidden;
 }
 
 .back-button {
@@ -18,7 +20,8 @@
   padding: 0.5rem 1rem;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-family: 'VT323', monospace;
   transition: all 0.2s;
   z-index: 100;
 }
@@ -30,32 +33,34 @@
 
 .connections-header {
   text-align: center;
-  margin-bottom: 30px;
-  padding-top: 40px;
+  margin-bottom: 20px;
+  padding-top: 30px;
 }
 
 .connections-header h1 {
   font-size: 2.5rem;
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, #f9df6d 0%, #ba81c5 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  margin-bottom: 5px;
+  color: #fff;
+  font-family: 'VT323', monospace;
+  text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 .puzzle-info {
   font-size: 1rem;
   color: #999;
+  font-family: 'VT323', monospace;
 }
 
 .connections-split-view {
   display: flex;
   gap: 20px;
   flex: 1;
-  max-width: 1600px;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
   align-items: flex-start;
+  overflow: hidden;
 }
 
 .player-side {
@@ -63,9 +68,11 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 20px;
+  padding: 15px;
   transition: all 0.3s;
-  max-width: 600px;
+  max-width: 500px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
 }
 
 .player-side.active {
@@ -76,23 +83,32 @@
 
 .player-header {
   text-align: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 60px;
+  position: relative;
 }
 
 .player-header h2 {
   font-size: 1.5rem;
   margin: 0;
   color: #fff;
+  font-family: 'VT323', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .thinking {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: #f9df6d;
   margin-top: 8px;
   animation: pulse 1.5s infinite;
+  font-family: 'VT323', monospace;
+  position: absolute;
+  width: 100%;
+  text-align: center;
 }
 
 @keyframes pulse {
@@ -101,45 +117,49 @@
 }
 
 .player-stats {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .stat {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .stat-label {
   color: #999;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-family: 'VT323', monospace;
 }
 
 .stat-value {
-  font-weight: bold;
-  font-size: 1.1rem;
+  font-weight: normal;
+  font-size: 1.2rem;
+  font-family: 'VT323', monospace;
 }
 
 .player-guesses {
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
 .player-guesses h4 {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: #ff6b6b;
   font-size: 0.9rem;
   text-transform: uppercase;
+  font-family: 'VT323', monospace;
 }
 
 .guess-item {
-  padding: 8px;
-  margin-bottom: 6px;
+  padding: 6px;
+  margin-bottom: 4px;
   background: rgba(255, 0, 0, 0.05);
   border: 1px solid rgba(255, 0, 0, 0.1);
   border-radius: 6px;
   font-size: 0.85rem;
   color: #ccc;
+  font-family: 'VT323', monospace;
 }
 
 .center-info {
@@ -153,10 +173,11 @@
 }
 
 .vs-divider {
-  font-size: 2rem;
-  font-weight: bold;
+  font-size: 2.5rem;
+  font-weight: normal;
   color: #666;
   margin: 20px 0;
+  font-family: 'VT323', monospace;
 }
 
 .winner-info {
@@ -187,45 +208,47 @@
 }
 
 .player-game-board {
-  margin-top: 20px;
+  margin-top: 15px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 }
 
 .found-groups-small {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .found-group-small {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 6px;
   color: #000;
   animation: slideIn 0.5s ease-out;
 }
 
 .group-name-small {
-  font-weight: bold;
-  font-size: 0.85rem;
+  font-weight: normal;
+  font-size: 1rem;
   text-transform: uppercase;
+  font-family: 'VT323', monospace;
 }
 
 .words-grid-small {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 4px;
 }
 
 .word-tile-small {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 10px 5px;
+  padding: 8px 3px;
   text-align: center;
   border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-family: 'VT323', monospace;
+  text-transform: uppercase;
   cursor: default;
   transition: all 0.2s;
 }
@@ -245,7 +268,9 @@
 
 .player-game-over p {
   color: #4CAF50;
-  font-weight: bold;
+  font-weight: normal;
+  font-family: 'VT323', monospace;
+  font-size: 1.2rem;
 }
 
 .found-groups {
@@ -399,11 +424,117 @@
 
 .loading, .error {
   text-align: center;
-  font-size: 1.5rem;
+  font-size: 2rem;
   margin-top: 100px;
   color: #999;
+  font-family: 'VT323', monospace;
 }
 
 .error {
   color: #ff6b6b;
+}
+
+/* Game Overlay */
+.game-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.game-overlay-content {
+  background: #000;
+  border: 2px solid #4CAF50;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.game-over-title {
+  font-size: 3rem;
+  font-family: 'VT323', monospace;
+  color: #4CAF50;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.winner-name {
+  font-size: 2rem;
+  font-family: 'VT323', monospace;
+  color: #fff;
+  margin-bottom: 30px;
+}
+
+.final-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 30px;
+  gap: 30px;
+}
+
+.stat-box {
+  flex: 1;
+}
+
+.stat-box h3 {
+  font-size: 1.2rem;
+  font-family: 'VT323', monospace;
+  color: #999;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.stat-box .value {
+  font-size: 2.5rem;
+  font-family: 'VT323', monospace;
+  color: #fff;
+}
+
+.new-game-overlay-button {
+  background: #4CAF50;
+  color: #000;
+  border: none;
+  padding: 12px 30px;
+  font-size: 1.3rem;
+  font-family: 'VT323', monospace;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.new-game-overlay-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
 } 

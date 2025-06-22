@@ -13,12 +13,11 @@ import ModelSelection from "./pages/ModelSelection"
 import VotePage from "./pages/VotePage"
 
 const GAMES = [
-  { name: "Wordle", emoji: "📝", description: "Word guessing" },
-  { name: "Trivia", emoji: "🧠", description: "Test your knowledge" },
-  { name: "NYT Connections", emoji: "🔗", description: "Find the connections" },
-  { name: "Battleship", emoji: "🚢", description: "Naval strategy" },
-  { name: "Connect 4", emoji: "🔴", description: "Four in a row" },
-  { name: "Debate", emoji: "🎭", description: "AI argument showdown" }
+  { name: "Wordle", emoji: "📝", description: "Speed & Strategy" },
+  { name: "Trivia", emoji: "🧠", description: "Knowledge Race" },
+  { name: "NYT Connections", emoji: "🔗", description: "Pattern Recognition" },
+  { name: "Battleship", emoji: "🚢", description: "Strategic Warfare" },
+  { name: "Debate", emoji: "🎭", description: "Argument Battle" }
 ]
 
 function MainMenu() {
@@ -29,8 +28,8 @@ function MainMenu() {
   const storedPlayer1 = JSON.parse(sessionStorage.getItem('player1Model') || '{}')
   const storedPlayer2 = JSON.parse(sessionStorage.getItem('player2Model') || '{}')
   
-  const [player1Model, setPlayer1Model] = useState(storedPlayer1.id || "openai")
-  const [player2Model, setPlayer2Model] = useState(storedPlayer2.id || "anthropic")
+  const [player1Model, setPlayer1Model] = useState(storedPlayer1.id || "gpt-4o-mini")
+  const [player2Model, setPlayer2Model] = useState(storedPlayer2.id || "claude-3-haiku-20240307")
   const [gameStarted, setGameStarted] = useState(false)
 
   const handleGameSelect = (game) => {
@@ -101,10 +100,10 @@ function MainMenu() {
           <button
             onClick={handleBackToMenu}
             style={{
-              position: "absolute",
+              position: "fixed",
               top: "10px",
               left: "10px",
-              zIndex: 1000,
+              zIndex: 10000,
               background: "rgba(0, 0, 0, 0.8)",
               border: "1px solid rgba(255, 255, 255, 0.3)",
               color: "#fff",
@@ -168,32 +167,18 @@ function MainMenu() {
   // Show games grid with selected models - no intermediate setup screen needed
   if (!gameStarted) {
     return (
-      <div className="app">
+      <div className="app game-selection-page">
         <button
           onClick={() => navigate("/")}
-          style={{
-            position: "absolute",
-            top: "10px",
-            left: "10px",
-            zIndex: 1000,
-            background: "rgba(0, 0, 0, 0.8)",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            color: "#fff",
-            padding: "0.5rem 1rem",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontSize: "0.9rem",
-            margin: 0,
-          }}
+          className="back-button"
         >
-          ← Back to Home
+          ← Back
         </button>
-        <div className="main-header">
-          <h1 className="title">VERSUS</h1>
-          <p className="subtitle">Choose your battleground</p>
-          <div className="selected-models-display">
-            <span className="model-name">{storedPlayer1.name || "GPT-4o"}</span> VS <span className="model-name">{storedPlayer2.name || "Claude 3"}</span>
-          </div>
+        
+        <div className="models-header">
+          <span className="model-name">{storedPlayer1.name || player1Model}</span> 
+          <span className="vs-text">VS</span> 
+          <span className="model-name">{storedPlayer2.name || player2Model}</span>
         </div>
 
         <div className="games-grid">

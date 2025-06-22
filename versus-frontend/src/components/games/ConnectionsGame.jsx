@@ -27,10 +27,6 @@ const ConnectionsGame = ({ player1Model, player2Model, onBack }) => {
 
   // Start a new game when component mounts
   useEffect(() => {
-    // Generate game ID immediately
-    const newGameId = `connections-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setGameId(newGameId);
-    
     // Try to start the game but handle failures gracefully
     startNewGame();
     
@@ -60,6 +56,9 @@ const ConnectionsGame = ({ player1Model, player2Model, onBack }) => {
 
       const data = await response.json();
       
+      // Use the game ID from the backend
+      setGameId(data.game_id);
+      
       // Initialize both player states
       const initialState = {
         puzzle_id: data.puzzle_id || 'demo',
@@ -78,6 +77,10 @@ const ConnectionsGame = ({ player1Model, player2Model, onBack }) => {
     } catch (error) {
       console.error('Error starting game:', error);
       setError('Backend not available - showing demo mode');
+      
+      // Generate a fallback game ID for demo mode
+      const fallbackGameId = `connections-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      setGameId(fallbackGameId);
       
       // Show demo state instead of failing
       const demoState = {
@@ -161,25 +164,38 @@ const ConnectionsGame = ({ player1Model, player2Model, onBack }) => {
     }
   };
 
+  // Check for game over
+  const checkGameOver = () => {
+    if (player1State && player1State.found_groups.length === 4) {
+      return { gameOver: true, winner: 'Player 1' };
+    }
+    if (player2State && player2State.found_groups.length === 4) {
+      return { gameOver: true, winner: 'Player 2' };
+    }
+    return { gameOver: false, winner: null };
+  };
+
+  const gameStatus = checkGameOver();
+
   // Auto-play for player 1
   useEffect(() => {
-    if (player1State && !player1State.game_over && !player1Processing) {
+    if (player1State && !player1State.game_over && !player1Processing && !gameStatus.gameOver) {
       const timer = setTimeout(() => {
         processAITurn(1);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [player1State, player1Processing]);
+  }, [player1State, player1Processing, gameStatus.gameOver]);
 
   // Auto-play for player 2
   useEffect(() => {
-    if (player2State && !player2State.game_over && !player2Processing) {
+    if (player2State && !player2State.game_over && !player2Processing && !gameStatus.gameOver) {
       const timer = setTimeout(() => {
         processAITurn(2);
       }, 1500); // Slight offset to avoid simultaneous requests
       return () => clearTimeout(timer);
     }
-  }, [player2State, player2Processing]);
+  }, [player2State, player2Processing, gameStatus.gameOver]);
 
   if (loading) {
     return (
@@ -254,6 +270,33 @@ const ConnectionsGame = ({ player1Model, player2Model, onBack }) => {
             Puzzle #{player1State.puzzle_id} • {player1State.date}
           </div>
         </div>
+
+        {/* Game Overlay */}
+        {gameStatus.gameOver && (
+          <div className="game-overlay">
+            <div className="game-overlay-content">
+              <h2 className="game-over-title">GAME OVER!</h2>
+              <div className="winner-name">
+                {gameStatus.winner === 'Player 1' ? getDisplayName(player1Model) : getDisplayName(player2Model)} WINS!
+              </div>
+              
+              <div className="final-stats">
+                <div className="stat-box">
+                  <h3>{getDisplayName(player1Model)}</h3>
+                  <div className="value">{player1State.found_groups.length}</div>
+                </div>
+                <div className="stat-box">
+                  <h3>{getDisplayName(player2Model)}</h3>
+                  <div className="value">{player2State.found_groups.length}</div>
+                </div>
+              </div>
+              
+              <button onClick={startNewGame} className="new-game-overlay-button">
+                NEW GAME
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="connections-split-view">
           {/* Player 1 Side */}

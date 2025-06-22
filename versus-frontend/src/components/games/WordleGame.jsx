@@ -1,321 +1,278 @@
-import { useState, useEffect } from 'react'
-import StartBattleModal from './wordle/StartBattleModal'
-import ModernGameBoard from './wordle/ModernGameBoard'
-import ModernGameInterface from './wordle/ModernGameInterface'
-import SidebarVote from '../SidebarVote'
-import { useGameLoop } from '../../hooks/useWordleGameLoop'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import './wordle/Wordle.css';
 
-const WordleGame = ({ player1Model, player2Model, onBack }) => {
-  const [secretWord, setSecretWord] = useState('')
-  const [showModal, setShowModal] = useState(true)
-  const [gameState, setGameState] = useState(null)
-  const [latestReasoning, setLatestReasoning] = useState({})
-  const [currentTurn, setCurrentTurn] = useState(1)
-  const [isThinking, setIsThinking] = useState(false)
-  const [gameId, setGameId] = useState('')
+const WordleGame = () => {
+  const navigate = useNavigate();
+  const [gameState, setGameState] = useState({
+    player1: {
+      guesses: [],
+      feedback: [],
+      reasoning: [],
+      currentGuess: '',
+      isThinking: false
+    },
+    player2: {
+      guesses: [],
+      feedback: [],
+      reasoning: [],
+      currentGuess: '',
+      isThinking: false
+    },
+    gameOver: false,
+    winner: null,
+    secretWord: null,
+    gameStarted: false
+  });
   
-  const { startGame, getNextMove, isLoading } = useGameLoop()
+  const [selectedWord, setSelectedWord] = useState('');
+  const [gameId, setGameId] = useState(null);
+  const [showStartModal, setShowStartModal] = useState(true);
 
-  // Convert model IDs to the backend format
-  const getBackendModelName = (modelId) => {
-    if (modelId?.includes('gpt') || modelId?.includes('openai')) return 'openai'
-    if (modelId?.includes('claude') || modelId?.includes('anthropic')) return 'anthropic'
-    // Add more model mappings as needed
-    return modelId || 'openai' // fallback
-  }
+  // Get stored models from localStorage
+  const storedModels = JSON.parse(localStorage.getItem('selectedModels') || '{}');
+  const player1Model = storedModels.player1 || { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai' };
+  const player2Model = storedModels.player2 || { id: 'claude-3-haiku', name: 'Claude 3 Haiku', provider: 'anthropic' };
 
-  const backendPlayer1 = getBackendModelName(player1Model)
-  const backendPlayer2 = getBackendModelName(player2Model)
+  const wordList = [
+    'CRANE', 'SLATE', 'AUDIO', 'HOUSE', 'ROUND',
+    'TRAIN', 'LIGHT', 'BRAIN', 'CLOUD', 'PIANO',
+    'BEACH', 'CHAIR', 'DANCE', 'EAGLE', 'FLAME',
+    'GRAPE', 'HEART', 'IVORY', 'JOKER', 'KNIFE',
+    'LEMON', 'MOUSE', 'NIGHT', 'OCEAN', 'PEACH',
+    'QUEST', 'ROBIN', 'SNAKE', 'TIGER', 'ULTRA',
+    'VOICE', 'WATER', 'YOUTH', 'ZEBRA', 'TESTS'
+  ];
 
-  // Get display names for models
-  const getDisplayName = (modelId) => {
-    if (!modelId) return 'Unknown'
-    if (modelId.includes('gpt-4o')) return 'GPT-4o'
-    if (modelId.includes('gpt-4-turbo')) return 'GPT-4 Turbo'
-    if (modelId.includes('gpt-3.5')) return 'GPT-3.5'
-    if (modelId.includes('claude-3-opus')) return 'Claude 3 Opus'
-    if (modelId.includes('claude-3-sonnet')) return 'Claude 3 Sonnet'
-    if (modelId.includes('claude-3-haiku')) return 'Claude 3 Haiku'
-    if (modelId.includes('gemini')) return 'Gemini'
-    return modelId.charAt(0).toUpperCase() + modelId.slice(1)
-  }
-
-  const player1DisplayName = getDisplayName(player1Model)
-  const player2DisplayName = getDisplayName(player2Model)
-
-  const handleStartBattle = async (word) => {
-    console.log('Starting battle with word:', word)
-    setSecretWord(word)
-    setShowModal(false)
+  const startGame = async () => {
+    const word = selectedWord || wordList[Math.floor(Math.random() * wordList.length)];
     
-    // Generate game ID for voting
-    const newGameId = `wordle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    setGameId(newGameId)
-    
-    // Start the game on backend
-    const result = await startGame(word)
-    console.log('Start game result:', result)
-    if (result) {
-      // Start the game loop
-      runGameLoop()
-    } else {
-      console.error('Failed to start game')
-              alert('Failed to start game. Make sure the backend server is running on port 8000.')
-    }
-  }
-
-  const runGameLoop = async () => {
-    console.log('Starting SIMULTANEOUS AI race...')
-    let gameOver = false
-    let roundCount = 0
-    const MAX_ROUNDS = 50 // Safety limit
-    
-    // First, get initial state
     try {
-      const response = await fetch('http://localhost:8000/api/wordle/state')
-      if (!response.ok) {
-        throw new Error('Backend not responding')
+      const response = await fetch('http://localhost:8000/api/wordle/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret_word: word })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setGameId(data.game_id);
+        setShowStartModal(false);
+        setGameState(prev => ({ ...prev, gameStarted: true }));
+        
+        // Start the game loop
+        setTimeout(() => runGameLoop(data.game_id), 1000);
       }
-      const state = await response.json()
-      console.log('Initial game state:', state)
-      setGameState(state)
-    } catch (err) {
-      console.error('Failed to get initial state:', err)
-              alert('Failed to connect to backend. Make sure the server is running on port 8000.')
-      return
+    } catch (error) {
+      console.error('Error starting game:', error);
     }
+  };
+
+  const runGameLoop = async (gameId) => {
+    let gameActive = true;
+    const models = ['openai', 'anthropic'];
     
-    while (!gameOver && roundCount < MAX_ROUNDS) {
-      roundCount++
-      setCurrentTurn(roundCount)
-      setIsThinking(true)
-      console.log(`🏁 Round ${roundCount}: Both AIs thinking...`)
+    while (gameActive) {
+      // Make moves for both players in parallel
+      const movePromises = models.map(model => makeGuess(gameId, model));
+      const results = await Promise.allSettled(movePromises);
       
-      // Add delay for dramatic effect
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Check if game is over
+      const gameOver = results.some(result => 
+        result.status === 'fulfilled' && result.value && result.value.game_over
+      );
       
-      try {
-        // Both AIs make their moves SIMULTANEOUSLY
-        const [openaiPromise, anthropicPromise] = [
-          getNextMove(backendPlayer1),
-          getNextMove(backendPlayer2)
-        ]
-        
-        // Wait for both moves to complete
-        const [openaiResult, anthropicResult] = await Promise.all([
-          openaiPromise.catch(err => {
-            console.error('OpenAI move failed:', err)
-            return null
-          }),
-          anthropicPromise.catch(err => {
-            console.error('Anthropic move failed:', err)  
-            return null
-          })
-        ])
-        
-        // Store reasoning for both models
-        if (openaiResult?.detailed_reasoning) {
-          setLatestReasoning(prev => ({
-            ...prev,
-            openai: openaiResult.detailed_reasoning
-          }))
-        }
-        
-        if (anthropicResult?.detailed_reasoning) {
-          setLatestReasoning(prev => ({
-            ...prev,
-            anthropic: anthropicResult.detailed_reasoning
-          }))
-        }
-        
-        // Get updated game state
-        const stateResponse = await fetch('http://localhost:8000/api/wordle/state')
+      if (gameOver) {
+        gameActive = false;
+        // Get final state
+        const stateResponse = await fetch(`http://localhost:8000/api/wordle/state/${gameId}`);
         if (stateResponse.ok) {
-          const state = await stateResponse.json()
-          console.log(`Round ${roundCount} results:`, state)
-          setGameState(state)
-          gameOver = state.game_over
-          setIsThinking(false)
-          
-          if (gameOver) {
-            console.log(`🎉 GAME OVER! Winner: ${state.winner || 'TIE'}`)
-          }
+          const finalState = await stateResponse.json();
+          setGameState(prev => ({
+            ...prev,
+            gameOver: true,
+            winner: finalState.winner,
+            secretWord: finalState.secret_word
+          }));
+        }
+      }
+      
+      // Small delay between rounds
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+  };
+
+  const makeGuess = async (gameId, model) => {
+    const playerKey = model === 'openai' ? 'player1' : 'player2';
+    
+    // Show thinking state
+    setGameState(prev => ({
+      ...prev,
+      [playerKey]: { ...prev[playerKey], isThinking: true }
+    }));
+    
+    try {
+      const response = await fetch(`http://localhost:8000/api/wordle/guess/${gameId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (!result.error) {
+          setGameState(prev => ({
+            ...prev,
+            [playerKey]: {
+              guesses: [...prev[playerKey].guesses, result.guess],
+              feedback: [...prev[playerKey].feedback, result.feedback],
+              reasoning: [...prev[playerKey].reasoning, result.reasoning],
+              currentGuess: '',
+              isThinking: false
+            }
+          }));
         }
         
-      } catch (err) {
-        console.error('Error in game round:', err)
-        setIsThinking(false)
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        return result;
       }
+    } catch (error) {
+      console.error(`Error making guess for ${model}:`, error);
+      setGameState(prev => ({
+        ...prev,
+        [playerKey]: { ...prev[playerKey], isThinking: false }
+      }));
     }
-    
-    console.log(`Race ended after ${roundCount} rounds`)
-  }
+  };
 
-  // Calculate game stats for the interface
-  const getGameStats = () => {
-    if (!gameState) return null
+  const renderGrid = (player, playerKey) => {
+    const guesses = gameState[playerKey].guesses;
+    const feedback = gameState[playerKey].feedback;
+    const isThinking = gameState[playerKey].isThinking;
     
-    const calculateStats = (guesses, feedback) => {
-      let correct = 0
-      let partial = 0
-      
-      feedback.forEach(fb => {
-        fb.forEach(status => {
-          if (status === 'green') correct++
-          else if (status === 'yellow') partial++
-        })
-      })
-      
-      return { guesses: guesses.length, correct, partial }
-    }
-    
-    return {
-      openai: calculateStats(gameState.models.openai.guesses, gameState.models.openai.feedback),
-      anthropic: calculateStats(gameState.models.anthropic.guesses, gameState.models.anthropic.feedback)
-    }
-  }
-
-  if (showModal) {
-    return <StartBattleModal onSubmit={handleStartBattle} onCancel={onBack} />
-  }
-
-  if (!gameState) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-500 border-t-transparent mx-auto mb-6"></div>
-            <div className="absolute inset-0 rounded-full h-20 w-20 border-4 border-purple-500/30 animate-ping mx-auto"></div>
+      <div className="wordle-grid">
+        {[...Array(6)].map((_, rowIndex) => (
+          <div key={rowIndex} className="wordle-row">
+            {[...Array(5)].map((_, colIndex) => {
+              const guess = guesses[rowIndex];
+              const letter = guess ? guess[colIndex] : '';
+              const feedbackValue = feedback[rowIndex] ? feedback[rowIndex][colIndex] : '';
+              
+              let tileClass = 'wordle-tile';
+              if (feedbackValue === 'green') tileClass += ' correct';
+              else if (feedbackValue === 'yellow') tileClass += ' present';
+              else if (feedbackValue === 'black') tileClass += ' absent';
+              else if (rowIndex === guesses.length && isThinking) {
+                tileClass += ' thinking';
+              }
+              
+              return (
+                <div key={colIndex} className={tileClass}>
+                  {letter}
+                </div>
+              );
+            })}
           </div>
-          <div className="text-3xl font-black text-white mb-2">Initializing Battle</div>
-          <div className="text-slate-400 text-lg">Setting up AI vs AI confrontation...</div>
-        </div>
+        ))}
       </div>
-    )
-  }
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900" style={{ paddingRight: '60px' }}>
-      {/* Voting Sidebar */}
-      <SidebarVote 
-        gameId={gameId} 
-        gameName={`Wordle: ${player1DisplayName} vs ${player2DisplayName}`} 
-      />
+    <div className="wordle-container">
+      {/* Back Button */}
+      <button 
+        className="back-button"
+        onClick={() => navigate('/games')}
+      >
+        ← Back to Games
+      </button>
 
-      {/* Modern Header */}
-      <div className="bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl">
-        <div className="max-w-7xl mx-auto p-6">
-          <button 
-            onClick={onBack}
-            className="mb-6 px-6 py-3 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Games
-          </button>
-          
-          <div className="text-center">
-            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 mb-3">
-              AI WORDLE ARENA
-            </h1>
-            <p className="text-2xl text-slate-300 mb-6 font-medium">
-              {player1DisplayName} vs {player2DisplayName} · Real-Time Battle
-            </p>
-            
-            {gameState.game_over && (
-              <div className="mt-8 p-8 rounded-3xl bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm border border-slate-600/30 max-w-2xl mx-auto">
-                <div className="text-4xl font-black mb-4">
-                  {gameState.winner === 'TIE' ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">🤝 Epic Tie!</span>
-                  ) : gameState.winner === backendPlayer1 ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-400">🏆 {player1DisplayName} Victorious!</span>
-                  ) : gameState.winner === backendPlayer2 ? (
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">🏆 {player2DisplayName} Triumphant!</span>
-                  ) : (
-                    <span className="text-slate-400">Battle Complete</span>
-                  )}
-                </div>
-                <div className="text-2xl text-slate-300">
-                  The secret word was: 
-                  <span className="font-black text-3xl text-white px-4 py-2 bg-slate-700 rounded-xl ml-3">
-                    {gameState.secret_word}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Game Area */}
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-12 gap-8">
-          
-          {/* Left Sidebar - Game Interface */}
-          <div className="col-span-3">
-            <ModernGameInterface 
-              currentTurn={currentTurn}
-              isThinking={isThinking}
-              gameStats={getGameStats()}
-              strategies={latestReasoning}
-              gameState={gameState}
-            />
-          </div>
-          
-          {/* Center - Game Boards */}
-          <div className="col-span-9">
-            <div className="grid grid-cols-2 gap-8">
-              
-              {/* GPT-4o Board */}
-              <div className="space-y-6">
-                <ModernGameBoard
-                  guesses={gameState.models.openai.guesses}
-                  feedback={gameState.models.openai.feedback}
-                  modelName={player1DisplayName}
-                  isWinner={gameState.winner === backendPlayer1}
-                  guessCount={gameState.models.openai.guesses.length}
-                />
-              </div>
-              
-              {/* Claude Board */}
-              <div className="space-y-6">
-                <ModernGameBoard
-                  guesses={gameState.models.anthropic.guesses}
-                  feedback={gameState.models.anthropic.feedback}
-                  modelName={player2DisplayName}
-                  isWinner={gameState.winner === backendPlayer2}
-                  guessCount={gameState.models.anthropic.guesses.length}
-                />
-              </div>
-              
+      {/* Start Modal */}
+      {showStartModal && (
+        <div className="wordle-modal">
+          <div className="wordle-modal-content">
+            <h2>Start Wordle Battle</h2>
+            <div className="word-selection">
+              <p>Choose a word or let us pick randomly:</p>
+              <input
+                type="text"
+                placeholder="Enter 5-letter word"
+                value={selectedWord}
+                onChange={(e) => setSelectedWord(e.target.value.toUpperCase().slice(0, 5))}
+                maxLength={5}
+              />
+              <p className="word-hint">Leave empty for random word</p>
             </div>
-            
-            {/* Real-time Battle Status */}
-            {isThinking && (
-              <div className="mt-8 text-center">
-                <div className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 backdrop-blur-xl rounded-2xl p-6 border border-amber-700/50">
-                  <div className="flex items-center justify-center gap-4 mb-4">
-                    <div className="flex gap-2">
-                      <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                    <span className="text-amber-400 font-bold text-xl">Both AIs are analyzing...</span>
-                  </div>
-                  <div className="text-slate-300 text-lg">
-                    Turn {currentTurn} in progress - Watching real-time AI decision making
-                  </div>
-                </div>
+            <button onClick={startGame} className="start-button">
+              Start Battle
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Game Content */}
+      {gameState.gameStarted && (
+        <div className="wordle-game">
+          {/* Header */}
+          <div className="wordle-header">
+            <h1>WORDLE BATTLE</h1>
+            {gameState.gameOver && (
+              <div className="game-result">
+                <h2>{gameState.winner === 'openai' ? player1Model.name : player2Model.name} Wins!</h2>
+                <p>The word was: <strong>{gameState.secretWord}</strong></p>
               </div>
             )}
           </div>
-          
-        </div>
-      </div>
-    </div>
-  )
-}
 
-export default WordleGame 
+          {/* Game Board */}
+          <div className="wordle-board">
+            {/* Player 1 Side */}
+            <div className="player-section">
+              <div className="player-header">
+                <h2>{player1Model.name}</h2>
+                <span className="provider">{player1Model.provider}</span>
+              </div>
+              {renderGrid(player1Model, 'player1')}
+              <div className="guess-count">
+                Guesses: {gameState.player1.guesses.length}/6
+              </div>
+            </div>
+
+            {/* VS Divider */}
+            <div className="vs-divider">
+              <div className="vs-text">VS</div>
+            </div>
+
+            {/* Player 2 Side */}
+            <div className="player-section">
+              <div className="player-header">
+                <h2>{player2Model.name}</h2>
+                <span className="provider">{player2Model.provider}</span>
+              </div>
+              {renderGrid(player2Model, 'player2')}
+              <div className="guess-count">
+                Guesses: {gameState.player2.guesses.length}/6
+              </div>
+            </div>
+          </div>
+
+          {/* Play Again Button */}
+          {gameState.gameOver && (
+            <div className="play-again-container">
+              <button 
+                className="play-again-button"
+                onClick={() => window.location.reload()}
+              >
+                Play Again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default WordleGame; 

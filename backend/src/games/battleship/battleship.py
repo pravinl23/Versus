@@ -90,18 +90,20 @@ class BattleshipGame(BaseGame):
                         }
                         self._place_ship_on_board(board, ship_data)
                         placed = True
+                        
+                        # Track placement update
+                        self.placement_updates.append({
+                            'player': player,
+                            'ship': ship_name,
+                            'size': ship_size,
+                            'position': {'row': row, 'col': col},
+                            'orientation': orientation
+                        })
                     
                     attempts += 1
         
         self.game_state[f'player{player}_ships_placed'] = True
-        self.ships_remaining[player] -= 1
-        self.placement_updates.append({
-            'player': player,
-            'ship': ship_data['id'],
-            'size': ship_data['size'],
-            'position': {'row': row, 'col': col},
-            'direction': orientation
-        })
+        self.ships_placed[player] = True
     
     def place_ship(self, player: int, ship_data: Dict):
         """Place a single ship on the board"""
@@ -165,7 +167,7 @@ class BattleshipGame(BaseGame):
         """Process a shot at coordinates"""
         try:
             if not (0 <= row < self.board_size and 0 <= col < self.board_size):
-                return {"success": False, "result": "invalid"}
+                return {"success": False, "result": "invalid", "reason": "Coordinates out of bounds"}
                 
             # Get boards
             shots_key = f'player{self.current_player}_shots'
@@ -173,18 +175,16 @@ class BattleshipGame(BaseGame):
             
             # Check if already shot here
             if self.game_state[shots_key][row][col] is not None:
-                return {"success": False, "result": "already_shot"}
+                return {"success": False, "result": "already_shot", "reason": f"Already shot at {chr(col + ord('A'))}{row + 1}"}
             
             # Check if hit or miss
             target_cell = self.game_state[opponent_board_key][row][col]
             if target_cell:
                 self.game_state[shots_key][row][col] = 'hit'
                 result = 'hit'
-                # Update remaining ships
-                if self.current_player == 1:
-                    self.ships_remaining[2] -= 1
-                else:
-                    self.ships_remaining[1] -= 1
+                # Update remaining ships for the opponent
+                opponent = 3 - self.current_player
+                self.ships_remaining[opponent] -= 1
             else:
                 self.game_state[shots_key][row][col] = 'miss'
                 result = 'miss'
@@ -211,7 +211,7 @@ class BattleshipGame(BaseGame):
             
         except Exception as e:
             print(f"Error in make_move: {e}")
-            return {"success": False, "result": "error"}
+            return {"success": False, "result": "error", "reason": str(e)}
     
     def check_winner(self) -> Optional[int]:
         """Check if someone has won"""
@@ -225,8 +225,21 @@ class BattleshipGame(BaseGame):
         """Generate prompt for LLM to make a move"""
         shots = self.game_state[f'player{player}_shots']
         
-        # Create a visual representation of the target board
-        board_str = "   A B C D E F G H\n"
+        # Find all available positions
+        available_positions = []
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                if shots[i][j] is None:
+                    col_letter = chr(j + ord('A'))
+                    available_positions.append(f"{col_letter}{i + 1}")
+        
+        # If no positions available, something is wrong
+        if not available_positions:
+            return "No positions available. Game should be over."
+        
+        # Create a simple board visualization
+        board_str = "Your shots so far:\n"
+        board_str += "   A B C D E F G H\n"
         for i in range(self.board_size):
             board_str += f"{i+1:2} "
             for j in range(self.board_size):
@@ -238,59 +251,53 @@ class BattleshipGame(BaseGame):
                     board_str += ". "
             board_str += "\n"
         
-        # Find recent hits that might be part of unsunk ships
-        recent_hits = []
-        potential_targets = []
-        
+        # Find hits with unexplored adjacent cells for strategic targeting
+        strategic_targets = []
         for i in range(self.board_size):
             for j in range(self.board_size):
                 if shots[i][j] == 'hit':
-                    # Check if this hit has unexplored adjacent cells
-                    has_unexplored = False
-                    adjacent_cells = []
-                    
-                    # Check all four directions
+                    # Check adjacent cells
                     for di, dj in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                         ni, nj = i + di, j + dj
                         if 0 <= ni < self.board_size and 0 <= nj < self.board_size:
                             if shots[ni][nj] is None:
-                                has_unexplored = True
                                 col_letter = chr(nj + ord('A'))
-                                adjacent_cells.append(f"{col_letter}{ni + 1}")
-                    
-                    if has_unexplored:
-                        col_letter = chr(j + ord('A'))
-                        recent_hits.append(f"{col_letter}{i + 1}")
-                        potential_targets.extend(adjacent_cells)
+                                strategic_targets.append(f"{col_letter}{ni + 1}")
         
-        # Get recent moves
-        recent_moves = self.game_state['last_moves'][-10:]
-        moves_str = "\n".join([f"Move {m['move']}: {m['result']}" for m in recent_moves if m['player'] == player])
+        # Remove duplicates from strategic targets
+        strategic_targets = list(set(strategic_targets))
         
-        # Build strategy advice
-        strategy_advice = ""
-        if recent_hits:
-            strategy_advice = f"\n\nIMPORTANT STRATEGY: You have hits at {', '.join(recent_hits[:3])} that likely belong to unsunk ships!"
-            strategy_advice += f"\nFocus on adjacent cells to these hits: {', '.join(potential_targets[:5])}"
-            strategy_advice += "\nShips are placed in straight lines (horizontal or vertical), so target cells in line with existing hits."
+        # Pick a position to suggest
+        if strategic_targets:
+            suggested = strategic_targets[0]  # Suggest first strategic target
+            strategy_hint = f"\nRECOMMENDED: Target {suggested} (adjacent to a hit)"
         else:
-            strategy_advice = "\n\nNo recent hits to follow up on. Use a search pattern to find ships."
+            # No strategic targets, pick from center area first
+            center_positions = []
+            for pos in available_positions:
+                col = ord(pos[0]) - ord('A')
+                row = int(pos[1:]) - 1
+                if 2 <= row <= 5 and 2 <= col <= 5:
+                    center_positions.append(pos)
+            
+            if center_positions:
+                suggested = center_positions[0]
+                strategy_hint = f"\nRECOMMENDED: Target {suggested} (center area)"
+            else:
+                suggested = available_positions[0]
+                strategy_hint = f"\nRECOMMENDED: Target {suggested}"
         
-        prompt = f"""You are playing Battleship on an 8x8 board. You need to sink all enemy ships.
+        prompt = f"""You are playing Battleship on an 8x8 grid (A-H, 1-8).
 
-Your target board (X = hit, O = miss, . = unknown):
 {board_str}
 
-Your recent moves:
-{moves_str}
+Legend: X = hit, O = miss, . = not yet shot
 
-Ships in the game: Carrier (4), Battleship (3), Destroyer (3), Submarine (2), Patrol (2)
-{strategy_advice}
+Available positions: {', '.join(available_positions[:10])}... ({len(available_positions)} total)
+{strategy_hint}
 
-IMPORTANT: Respond with ONLY the coordinates in format "A5" or "H8" (letter + number).
-Do NOT include any other text, JSON, or explanation. Just the coordinate.
-
-Make your next shot:"""
+IMPORTANT: Reply with ONLY ONE coordinate (e.g., "A5" or "H8"). Nothing else!
+Your move:"""
         
         return prompt
     
@@ -323,8 +330,8 @@ Make your next shot:"""
             "board_size": self.board_size,
             "current_player": self.current_player,
             "winner": self.winner,
-            "player1_shots": self.game_state[f'player1_shots'],
-            "player2_shots": self.game_state[f'player2_shots'],
+            "player1_shots": self.game_state['player1_shots'],
+            "player2_shots": self.game_state['player2_shots'],
             "ships_remaining": self.ships_remaining,
             "status": self.status,
             "placement_updates": self.placement_updates,  # Include placement updates
@@ -333,7 +340,7 @@ Make your next shot:"""
         
         # Include ship positions only during placement phase or if game is over
         if self.status == "placement" or self.winner:
-            state["player1_ships"] = self.game_state[f'player1_board']
-            state["player2_ships"] = self.game_state[f'player2_board']
+            state["player1_ships"] = self.game_state['player1_board']
+            state["player2_ships"] = self.game_state['player2_board']
         
         return state 

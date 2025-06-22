@@ -4,7 +4,7 @@ Common utilities and base classes for all games
 
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 import asyncio
 
@@ -14,58 +14,142 @@ load_dotenv()
 class LLMClient:
     """Wrapper for different LLM API clients"""
     
-    def __init__(self, model_type: str, use_async: bool = False):
-        self.model_type = model_type.upper()
+    def __init__(self, model_id: str, use_async: bool = False):
+        self.model_id = model_id
         self.use_async = use_async
+        self.model_type, self.model_name = self._parse_model_id(model_id)
         self.client = self._initialize_client()
     
+    def _parse_model_id(self, model_id: str) -> Tuple[str, str]:
+        """Parse model ID to determine provider and model name"""
+        model_id_lower = model_id.lower()
+        
+        # OpenAI models
+        if any(x in model_id_lower for x in ['gpt', 'o1', 'davinci', 'curie', 'babbage', 'ada']):
+            return "OPENAI", model_id
+        
+        # Claude models
+        elif 'claude' in model_id_lower:
+            return "ANTHROPIC", model_id
+        
+        # Gemini models
+        elif 'gemini' in model_id_lower:
+            return "GOOGLE", model_id
+        
+        # Groq models
+        elif any(x in model_id_lower for x in ['mixtral', 'llama', 'groq']):
+            return "GROQ", model_id
+        
+        # Default to OpenAI
+        else:
+            return "OPENAI", model_id
+    
     def _initialize_client(self):
+        """Initialize the appropriate API client"""
         if self.model_type == "OPENAI":
-            if self.use_async:
-                from openai import AsyncOpenAI
-                return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            else:
-                from openai import OpenAI
-                return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            from openai import OpenAI
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY not found in environment variables")
+            return OpenAI(api_key=api_key)
+            
         elif self.model_type == "ANTHROPIC":
-            if self.use_async:
-                from anthropic import AsyncAnthropic
-                return AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            else:
-                from anthropic import Anthropic
-                return Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        elif self.model_type == "GEMINI":
+            from anthropic import Anthropic
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+            return Anthropic(api_key=api_key)
+            
+        elif self.model_type == "GOOGLE":
             import google.generativeai as genai
-            genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            return genai
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY not found in environment variables")
+            genai.configure(api_key=api_key)
+            return genai.GenerativeModel(self.model_name)
+            
         elif self.model_type == "GROQ":
-            if self.use_async:
-                from groq import AsyncGroq
-                return AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
-            else:
-                from groq import Groq
-                return Groq(api_key=os.getenv("GROQ_API_KEY"))
+            from groq import Groq
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                raise ValueError("GROQ_API_KEY not found in environment variables")
+            return Groq(api_key=api_key)
+            
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
+    
+    def get_response(self, prompt: str, max_tokens: int = 100, temperature: float = 0.7) -> str:
+        """Get a generic response from the LLM"""
+        try:
+            if self.model_type == "OPENAI":
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                return response.choices[0].message.content.strip()
+                
+            elif self.model_type == "ANTHROPIC":
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                return response.content[0].text.strip()
+                
+            elif self.model_type == "GOOGLE":
+                # Google Gemini uses a different API structure
+                response = self.client.generate_content(prompt)
+                return response.text.strip()
+                
+            elif self.model_type == "GROQ":
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                return response.choices[0].message.content.strip()
+                
+            elif self.model_type == "GEMINI":
+                model = self.client.GenerativeModel(self.model_name)
+                response = model.generate_content(prompt)
+                return response.text.strip()
+                
+            else:
+                raise ValueError(f"Unknown model type: {self.model_type}")
+                
+        except Exception as e:
+            print(f"Error getting response from {self.model_id}: {e}")
+            return None
     
     def get_move(self, prompt: str, game_state: dict = None) -> str:
         """Get a move from the LLM (sync version for battleship)"""
         try:
+            # First, try to get a move from the LLM
             if self.model_type == "OPENAI":
                 response = self.client.chat.completions.create(
-                    model="gpt-4o-mini",  # Using a faster model for games
+                    model=self.model_name,
                     messages=[
-                        {"role": "system", "content": "You are an expert battleship player. Respond with ONLY the coordinate (e.g. 'A5' or 'H8'). No other text."},
+                        {"role": "system", "content": "You are playing Battleship. Reply with ONLY a coordinate like 'A5'. No other text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
-                    max_tokens=10  # Reduced since we only need a coordinate
+                    max_tokens=10
                 )
                 content = response.choices[0].message.content.strip()
                 
             elif self.model_type == "ANTHROPIC":
                 response = self.client.messages.create(
-                    model="claude-3-haiku-20240307",  # Using a faster model for games
+                    model=self.model_name,
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
@@ -76,9 +160,9 @@ class LLMClient:
                 
             elif self.model_type == "GROQ":
                 response = self.client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model=self.model_name,
                     messages=[
-                        {"role": "system", "content": "You are an expert battleship player. Respond with ONLY the coordinate (e.g. 'A5' or 'H8'). No other text."},
+                        {"role": "system", "content": "You are playing Battleship. Reply with ONLY a coordinate like 'A5'. No other text."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
@@ -86,18 +170,23 @@ class LLMClient:
                 )
                 content = response.choices[0].message.content.strip()
                 
-            elif self.model_type == "GEMINI":
-                model = self.client.GenerativeModel('gemini-pro')
-                response = model.generate_content(prompt)
+            elif self.model_type == "GOOGLE":
+                response = self.client.generate_content(prompt)
                 content = response.text.strip()
                 
             else:
-                # Fallback for testing - make random valid moves
-                import random
-                import string
-                col = random.choice(string.ascii_uppercase[:8])
-                row = random.randint(1, 8)
-                return f"{col}{row}"
+                # Fallback - use suggested position from prompt
+                import re
+                suggested_match = re.search(r'Suggested position: ([A-H][1-8])', prompt)
+                if suggested_match:
+                    return suggested_match.group(1)
+                else:
+                    # Random fallback
+                    import random
+                    import string
+                    col = random.choice(string.ascii_uppercase[:8])
+                    row = random.randint(1, 8)
+                    return f"{col}{row}"
             
             # Clean up the response - extract just the coordinate
             import re
@@ -106,17 +195,26 @@ class LLMClient:
             if coord_match:
                 return coord_match.group(0).upper()
             
-            # If no valid coordinate found, try to extract any letter-number combo
-            parts = re.findall(r'[A-Ha-h]|[1-8]', content)
-            if len(parts) >= 2:
-                return parts[0].upper() + parts[1]
+            # If no valid coordinate found, use suggested from prompt
+            suggested_match = re.search(r'Suggested position: ([A-H][1-8])', prompt)
+            if suggested_match:
+                return suggested_match.group(1)
             
-            # Last resort - return the whole content
-            return content.upper()
+            # Last resort - random valid move
+            import random
+            import string
+            col = random.choice(string.ascii_uppercase[:8])
+            row = random.randint(1, 8)
+            return f"{col}{row}"
                 
         except Exception as e:
-            print(f"Error getting move from {self.model_type}: {e}")
-            # Return a fallback move
+            print(f"Error getting move from {self.model_type} ({self.model_name}): {e}")
+            # Extract suggested position from prompt as fallback
+            import re
+            suggested_match = re.search(r'Suggested position: ([A-H][1-8])', prompt)
+            if suggested_match:
+                return suggested_match.group(1)
+            # Final fallback - random move
             import random
             import string
             col = random.choice(string.ascii_uppercase[:8])

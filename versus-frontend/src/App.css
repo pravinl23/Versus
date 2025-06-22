@@ -7,11 +7,8 @@
 body {
   background-color: #000;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'VT323', monospace;
   min-height: 100vh;
-  background-image: 
-    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
 }
 
 #root {
@@ -25,13 +22,12 @@ body {
 
 .app {
   min-height: 100vh;
-  background: linear-gradient(135deg, #000 0%, #1a1a2e 25%, #16213e  50%, #0f3460 75%, #000 100%);
+  background: #000;
   color: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  padding: 2rem;
   position: relative;
   overflow-x: hidden;
 }
@@ -43,105 +39,180 @@ body {
 
 /* Main page styles */
 .main-header {
-  margin-bottom: 3rem;
+  display: none;
 }
 
 .title {
-  font-size: 4rem;
-  font-weight: 900;
+  font-size: 5rem;
+  font-weight: 400;
   margin-bottom: 0.5rem;
-  background: linear-gradient(45deg, #fff, #00d4ff, #ff6b6b);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
 }
 
 .subtitle {
-  font-size: 1.5rem;
-  color: #888;
-  margin-bottom: 1rem;
+  font-size: 1.8rem;
+  color: #999;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .selected-models-display {
-  font-size: 1.3rem;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 1rem 2rem;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  margin-top: 1rem;
-  display: inline-block;
+  display: none;
 }
 
-.selected-models-display .model-name {
-  color: #00d4ff;
-  font-weight: 800;
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+/* Game selection page specific */
+.game-selection-page {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding-top: 120px; /* Add space for fixed header */
+}
+
+/* Models header at the top */
+.models-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #000;
+  border-bottom: 3px solid #333;
+  padding: 1.5rem 2rem;
+  font-size: 2.5rem;
+  text-align: center;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  height: 90px; /* Fixed height for consistent spacing */
+}
+
+.models-header .model-name {
+  color: #ffcc00;
+  font-weight: 400;
+  text-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.models-header .vs-text {
+  color: #666;
+  font-size: 2rem;
 }
 
 /* Game grid */
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  margin-top: 3rem;
-  max-width: 1400px;
+  max-width: 1000px;
   width: 100%;
+  animation: fadeIn 1s ease-out 0.4s both;
+  place-items: center;
 }
 
+/* Remove the complex centering for last row - it's causing overlap */
+/* Just let the grid handle the layout naturally */
+
 .game-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 2rem;
+  background: #000;
+  border: 2px solid #333;
+  padding: 2rem 1.5rem;
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: center;
-  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 280px;
+}
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, transparent 0%, rgba(255, 255, 255, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .game-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: #ffcc00;
   transform: translateY(-4px);
-  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(255, 204, 0, 0.2);
+}
+
+.game-card:hover::before {
+  opacity: 1;
 }
 
 .game-emoji {
   font-size: 3rem;
   margin-bottom: 1rem;
+  filter: grayscale(0.2);
+}
+
+.game-card:hover .game-emoji {
+  filter: grayscale(0);
+  transform: scale(1.1);
+  transition: all 0.3s ease;
 }
 
 .game-card h3 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.6rem;
+  margin-bottom: 0.3rem;
   color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 400;
 }
 
 .game-description {
-  color: #888;
-  font-size: 0.9rem;
+  color: #666;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* Game setup page */
+.game-card:hover .game-description {
+  color: #999;
+}
+
+/* Back button */
 .back-button {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
+  border: 2px solid #333;
+  color: #999;
+  padding: 0.6rem 1.5rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-bottom: 2rem;
-  font-size: 1rem;
+  font-size: 1.2rem;
+  font-family: 'VT323', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 200;
 }
 
 .back-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+  border-color: #fff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
+/* Game setup page */
 .game-setup {
   text-align: center;
   max-width: 600px;
@@ -180,8 +251,8 @@ body {
 }
 
 .model-name {
-  color: #00d4ff;
-  font-weight: 800;
+  color: #ffcc00;
+  font-weight: 400;
 }
 
 .battle-description {
@@ -283,10 +354,15 @@ body {
   color: #666;
 }
 
-/* Responsive */
+/* Responsive adjustments */
 @media (max-width: 1200px) {
   .games-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  
+  .game-card {
+    max-width: 250px;
   }
 }
 
@@ -295,10 +371,36 @@ body {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
+  
+  .models-header {
+    font-size: 1.6rem;
+    padding: 1rem;
+  }
+  
+  .models-header .vs-text {
+    font-size: 1.4rem;
+  }
+  
+  .game-card {
+    padding: 1.5rem 1rem;
+  }
+  
+  .game-emoji {
+    font-size: 2.5rem;
+  }
+  
+  .game-card h3 {
+    font-size: 1.4rem;
+  }
 }
 
 @media (max-width: 480px) {
   .games-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .models-header {
+    font-size: 1.3rem;
+    gap: 1rem;
   }
 }

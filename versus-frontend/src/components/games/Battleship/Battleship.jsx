@@ -26,17 +26,13 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
   const [gameStartTime, setGameStartTime] = useState(null);
   const [gameTimer, setGameTimer] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const wsRef = useRef(null);
 
   // Convert model IDs to the backend format
   const getBackendModelName = (modelId) => {
-    if (!modelId) return 'openai'; // fallback
-    const modelStr = modelId.toString().toLowerCase();
-    if (modelStr.includes('gpt') || modelStr.includes('openai')) return 'openai';
-    if (modelStr.includes('claude') || modelStr.includes('anthropic')) return 'anthropic';
-    if (modelStr.includes('gemini') || modelStr.includes('google')) return 'gemini';
-    if (modelStr.includes('groq') || modelStr.includes('mixtral') || modelStr.includes('llama')) return 'groq';
-    return 'openai'; // fallback
+    // Just return the model ID as-is, the backend will handle the parsing
+    return modelId || 'gpt-4o-mini'; // fallback
   };
 
   const backendPlayer1 = getBackendModelName(player1Model);
@@ -46,17 +42,26 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
   const getDisplayName = (modelId) => {
     if (!modelId) return 'Unknown';
     const modelStr = modelId.toString();
+    
+    // OpenAI models
     if (modelStr.includes('gpt-4o-mini')) return 'GPT-4o Mini';
     if (modelStr.includes('gpt-4o')) return 'GPT-4o';
     if (modelStr.includes('gpt-4-turbo')) return 'GPT-4 Turbo';
-    if (modelStr.includes('gpt-3.5')) return 'GPT-3.5';
-    if (modelStr.includes('claude-3-opus')) return 'Claude 3 Opus';
-    if (modelStr.includes('claude-3-sonnet')) return 'Claude 3 Sonnet';
+    if (modelStr.includes('gpt-3.5')) return 'GPT-3.5 Turbo';
+    
+    // Claude models
+    if (modelStr.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet';
     if (modelStr.includes('claude-3-haiku')) return 'Claude 3 Haiku';
-    if (modelStr.includes('gemini-pro')) return 'Gemini Pro';
-    if (modelStr.includes('gemini')) return 'Gemini';
-    if (modelStr.includes('mixtral')) return 'Mixtral';
-    if (modelStr.includes('llama')) return 'Llama';
+    
+    // Gemini models
+    if (modelStr.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro';
+    if (modelStr.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash';
+    
+    // Groq models
+    if (modelStr.includes('mixtral')) return 'Mixtral 8x7B';
+    if (modelStr.includes('llama-3.1-70b')) return 'Llama 3.1 70B';
+    if (modelStr.includes('llama-3.1-8b')) return 'Llama 3.1 8B';
+    
     return modelStr.charAt(0).toUpperCase() + modelStr.slice(1);
   };
 
@@ -71,7 +76,16 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
     
     // Try to connect to WebSocket, but don't fail if it doesn't work
     connectWebSocket(newGameId);
-  }, []);
+    
+    // Cleanup on unmount
+    return () => {
+      if (wsRef.current) {
+        console.log('Closing WebSocket connection on unmount');
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array to run only once
 
   const connectWebSocket = (gameId) => {
     try {
@@ -82,14 +96,18 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
         setIsConnected(true);
         setMessage('Connected! Setting up ships...');
         
-        // Start the game automatically
-        ws.send(JSON.stringify({
-          type: 'start_game',
-          player1Model: backendPlayer1,
-          player2Model: backendPlayer2,
-          autoPlaceShips: true
-        }));
-        setGameStatus(GAME_STATUS.IN_PROGRESS);
+        // Only start the game if not already started
+        if (!gameStarted) {
+          console.log('Sending models to backend:', { player1Model: backendPlayer1, player2Model: backendPlayer2 });
+          ws.send(JSON.stringify({
+            type: 'start_game',
+            player1Model: backendPlayer1,
+            player2Model: backendPlayer2,
+            autoPlaceShips: true
+          }));
+          setGameStarted(true);
+          setGameStatus(GAME_STATUS.IN_PROGRESS);
+        }
       };
 
       ws.onmessage = (event) => {
@@ -158,13 +176,15 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
   };
 
   const handleGameStateUpdate = (data) => {
+    console.log('Game state update:', data.type);
+    
     if (data.type === 'ship_placed') {
       if (data.player === 1) {
         setPlayer1Board(data.board);
       } else {
         setPlayer2Board(data.board);
       }
-      setMessage(`${data.ship} placed for Player ${data.player}`);
+      setMessage(`Ships placed for Player ${data.player}`);
     } else if (data.type === 'placement_complete') {
       setPlayer1Board(data.player1Board);
       setPlayer2Board(data.player2Board);
@@ -174,9 +194,15 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
       setCurrentPlayer(data.currentPlayer);
       if (data.player1Shots) setPlayer1Shots(data.player1Shots);
       if (data.player2Shots) setPlayer2Shots(data.player2Shots);
+      if (data.player1Board) setPlayer1Board(data.player1Board);
+      if (data.player2Board) setPlayer2Board(data.player2Board);
       if (data.status) setGameStatus(data.status);
       if (data.winner) setWinner(data.winner);
       if (data.message) setMessage(data.message);
+    } else if (data.type === 'game_over') {
+      setWinner(data.winner);
+      setGameStatus(GAME_STATUS.FINISHED);
+      setMessage(data.message);
     }
   };
 
@@ -247,16 +273,43 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
   };
 
   return (
-    <div className="battleship-game split-screen" style={{ paddingRight: '60px' }}>
+    <div className="battleship-game split-screen">
       <SidebarVote 
         gameId={gameId} 
         gameName={`Battleship: ${player1DisplayName} vs ${player2DisplayName}`} 
       />
       
+      {/* Winner Overlay */}
+      {winner && (
+        <div className="game-overlay">
+          <div className="game-overlay-content">
+            <h2 className="game-over-title">GAME OVER!</h2>
+            <div className="winner-name">
+              {winner === 1 ? player1DisplayName : player2DisplayName} WINS!
+            </div>
+            
+            <div className="final-stats">
+              <div className="stat-box">
+                <h3>WINNER</h3>
+                <div className="value">{winner === 1 ? player1DisplayName : player2DisplayName}</div>
+              </div>
+            </div>
+            
+            <button onClick={() => {
+              // Clean up WebSocket before going back
+              if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
+              }
+              onBack();
+            }} className="new-game-overlay-button">
+              BACK TO MENU
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div className="game-header">
-        <button onClick={onBack} className="back-button">
-          ← Back to Menu
-        </button>
         <GameTimer isActive={gameStatus === GAME_STATUS.IN_PROGRESS && !winner} />
         <div className="game-status-message">{message}</div>
       </div>
@@ -270,7 +323,7 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
           </div>
           
           <div className="boards-section">
-            <div className="board-container">
+            <div className="board-wrapper">
               <h4>Defense Grid</h4>
               <div className="board-with-labels">
                 <table className="battleship-table">
@@ -298,7 +351,7 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
               </div>
             </div>
             
-            <div className="board-container">
+            <div className="board-wrapper">
               <h4>Attack Grid</h4>
               <div className="board-with-labels">
                 <table className="battleship-table">
@@ -346,7 +399,7 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
           </div>
           
           <div className="boards-section">
-            <div className="board-container">
+            <div className="board-wrapper">
               <h4>Attack Grid</h4>
               <div className="board-with-labels">
                 <table className="battleship-table">
@@ -374,7 +427,7 @@ const Battleship = ({ player1Model, player2Model, onBack }) => {
               </div>
             </div>
             
-            <div className="board-container">
+            <div className="board-wrapper">
               <h4>Defense Grid</h4>
               <div className="board-with-labels">
                 <table className="battleship-table">
