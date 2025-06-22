@@ -27,7 +27,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
       runGameLoop()
     } else {
       console.error('Failed to start game')
-      alert('Failed to start game. Make sure the backend server is running on port 5001.')
+              alert('Failed to start game. Make sure the backend server is running on port 5002.')
     }
   }
 
@@ -39,7 +39,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
     
     // First, get initial state
     try {
-      const response = await fetch('http://localhost:5001/api/wordle/state')
+      const response = await fetch('http://localhost:5002/api/wordle/state')
       if (!response.ok) {
         throw new Error('Backend not responding')
       }
@@ -48,7 +48,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
       setGameState(state)
     } catch (err) {
       console.error('Failed to get initial state:', err)
-      alert('Failed to connect to backend. Make sure the server is running on port 5001.')
+              alert('Failed to connect to backend. Make sure the server is running on port 5002.')
       return
     }
     
@@ -96,7 +96,7 @@ const WordleGame = ({ player1Model, player2Model, onBack }) => {
         }
         
         // Get updated game state
-        const stateResponse = await fetch('http://localhost:5001/api/wordle/state')
+        const stateResponse = await fetch('http://localhost:5002/api/wordle/state')
         if (stateResponse.ok) {
           const state = await stateResponse.json()
           console.log(`Round ${roundCount} results:`, state)

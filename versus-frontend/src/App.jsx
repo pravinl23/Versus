@@ -21,7 +21,6 @@ function MainMenu() {
   const [gameStarted, setGameStarted] = useState(false)
 
   const handleStartMatch = () => {
-
     if (selectedGame.name === 'Trivia') {
       navigate('/trivia', { 
         state: { 
@@ -29,6 +28,13 @@ function MainMenu() {
           player2Model 
         } 
       })
+    } else if (selectedGame.name === 'Wordle') {
+      console.log('Starting match:', {
+        game: selectedGame.name,
+        player1: player1Model,
+        player2: player2Model
+      })
+      setGameStarted(true)
     } else {
       console.log('Starting match:', {
         game: selectedGame.name,

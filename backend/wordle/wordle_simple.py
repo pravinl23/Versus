@@ -449,4 +449,4 @@ if __name__ == '__main__':
     else:
         print("✅ API keys configured - ready to test real LLM intelligence!")
     
-    app.run(debug=True, port=5001, threaded=True) 
+    app.run(debug=True, port=5002, threaded=True) 
