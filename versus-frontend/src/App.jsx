@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import './App.css'
+import SimpleDebateGame from './components/SimpleDebateGame'
 
 const MODELS = ['GEMINI', 'ANTHROPIC', 'OPENAI', 'GROQ', 'CUSTOM UPLOAD']
 const GAMES = [
@@ -122,23 +123,14 @@ function MainMenu() {
   )
 }
 
-// Placeholder Debate component
-function DebateGame() {
-  return (
-    <div className="app">
-      <h1>🎭 Debate Game</h1>
-      <p>Debate game implementation coming soon...</p>
-      <button onClick={() => window.history.back()}>← Back</button>
-    </div>
-  )
-}
+
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<MainMenu />} />
-        <Route path="/debate" element={<DebateGame />} />
+        <Route path="/debate" element={<SimpleDebateGame />} />
       </Routes>
     </Router>
   )

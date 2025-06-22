@@ -24,40 +24,26 @@ const DebateGame = () => {
     "Universal basic income should be implemented",
     "Space exploration is worth the investment",
     "Cryptocurrency will replace traditional currency",
-    "Artificial intelligence will create more jobs than it destroys",
-    "Climate change is primarily caused by human activity",
-    "Privacy is more important than security"
+    "Human genetic modification should be allowed",
+    "Renewable energy can replace fossil fuels completely",
+    "Artificial intelligence will eliminate more jobs than it creates"
   ];
 
-  const availableModels = [
-    { value: 'OPENAI', label: 'GPT-4', icon: '🤖' },
-    { value: 'ANTHROPIC', label: 'Claude 3 Haiku', icon: '🧠' },
-    { value: 'GEMINI', label: 'Gemini Pro', icon: '💎' },
-    { value: 'GROQ', label: 'Mixtral 8x7B', icon: '⚡' }
+  const models = [
+    { id: 'OPENAI', name: 'GPT-4', emoji: '🧠' },
+    { id: 'ANTHROPIC', name: 'Claude 3', emoji: '🤖' },
+    { id: 'GEMINI', name: 'Gemini Pro', emoji: '⭐' },
+    { id: 'GROQ', name: 'Mixtral', emoji: '⚡' }
   ];
-
-  const handleInputChange = (field, value) => {
-    setSetupForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleTopicSelect = (topic) => {
-    setSetupForm(prev => ({
-      ...prev,
-      topic: topic
-    }));
-  };
 
   const handleStartDebate = async () => {
-    if (!setupForm.topic.trim()) {
-      setError('Please enter or select a debate topic');
+    if (!setupForm.topic || !setupForm.player1Model || !setupForm.player2Model) {
+      setError('Please fill in all fields');
       return;
     }
 
     if (setupForm.player1Model === setupForm.player2Model) {
-      setError('Please select different models for Player 1 and Player 2');
+      setError('Please select different models for each player');
       return;
     }
 
@@ -73,22 +59,24 @@ const DebateGame = () => {
         body: JSON.stringify({
           player1_model: setupForm.player1Model,
           player2_model: setupForm.player2Model,
-          topic: setupForm.topic.trim(),
+          topic: setupForm.topic,
           total_rounds: setupForm.totalRounds
-        })
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Failed to start debate: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Debate started:', data);
+      
       setDebateId(data.debate_id);
       setGameStarted(true);
       
-    } catch (error) {
-      console.error('Failed to start debate:', error);
-      setError(`Failed to start debate: ${error.message}`);
+    } catch (err) {
+      console.error('Failed to start debate:', err);
+      setError(`Failed to start debate: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -98,6 +86,10 @@ const DebateGame = () => {
     setGameStarted(false);
     setDebateId(null);
     setError('');
+  };
+
+  const handleBackToGames = () => {
+    navigate('/');
   };
 
   if (gameStarted && debateId) {
@@ -111,183 +103,177 @@ const DebateGame = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <button
-            onClick={() => navigate('/')}
-            className="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl">
+        <div className="max-w-4xl mx-auto p-6">
+          <button 
+            onClick={handleBackToGames}
+            className="mb-6 px-6 py-3 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium flex items-center gap-2"
           >
-            ← Back to Games
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Games
           </button>
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            🎭 Voice Debate Arena
-          </h1>
-          <p className="text-xl text-slate-300">
-            Watch AI models engage in sophisticated spoken debates
-          </p>
-        </div>
-
-        {/* Setup Form */}
-        <div className="max-w-4xl mx-auto bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 border border-slate-700">
-          <h2 className="text-2xl font-semibold mb-6 text-center">Setup Your Debate</h2>
           
-          {error && (
-            <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200">
-              {error}
-            </div>
-          )}
-
-          {/* Model Selection */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <div>
-              <label className="block text-sm font-medium mb-3 text-slate-300">
-                Player 1 Model
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {availableModels.map((model) => (
-                  <button
-                    key={`p1-${model.value}`}
-                    onClick={() => handleInputChange('player1Model', model.value)}
-                    className={`p-3 rounded-lg border transition-all duration-200 ${
-                      setupForm.player1Model === model.value
-                        ? 'border-blue-500 bg-blue-900/50 text-blue-200'
-                        : 'border-slate-600 bg-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{model.icon}</div>
-                    <div className="text-sm font-medium">{model.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-3 text-slate-300">
-                Player 2 Model
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {availableModels.map((model) => (
-                  <button
-                    key={`p2-${model.value}`}
-                    onClick={() => handleInputChange('player2Model', model.value)}
-                    className={`p-3 rounded-lg border transition-all duration-200 ${
-                      setupForm.player2Model === model.value
-                        ? 'border-green-500 bg-green-900/50 text-green-200'
-                        : 'border-slate-600 bg-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{model.icon}</div>
-                    <div className="text-sm font-medium">{model.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="text-center">
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 mb-3">
+              🎭 AI DEBATE ARENA
+            </h1>
+            <p className="text-2xl text-slate-300 mb-6 font-medium">
+              Voice-Powered AI Arguments
+            </p>
           </div>
+        </div>
+      </div>
 
+      {/* Setup Form */}
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-gradient-to-br from-slate-800/50 to-slate-700/50 backdrop-blur-xl rounded-3xl border border-slate-600/30 shadow-2xl p-8">
+          
           {/* Topic Selection */}
           <div className="mb-8">
-            <label className="block text-sm font-medium mb-3 text-slate-300">
-              Debate Topic
-            </label>
-            <div className="mb-4">
-              <input
-                type="text"
-                value={setupForm.topic}
-                onChange={(e) => handleInputChange('topic', e.target.value)}
-                placeholder="Enter your debate topic or select from below..."
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:border-purple-500 focus:outline-none text-white placeholder-slate-400"
-              />
-            </div>
+            <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-4xl">💭</span>
+              Choose Debate Topic
+            </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {predefinedTopics.map((topic, index) => (
                 <button
                   key={index}
-                  onClick={() => handleTopicSelect(topic)}
-                  className={`p-3 text-left rounded-lg border transition-all duration-200 ${
+                  onClick={() => setSetupForm({...setupForm, topic})}
+                  className={`p-4 rounded-xl text-left transition-all duration-300 transform hover:scale-105 ${
                     setupForm.topic === topic
-                      ? 'border-purple-500 bg-purple-900/50 text-purple-200'
-                      : 'border-slate-600 bg-slate-700 hover:border-slate-500'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                      : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
                   }`}
                 >
-                  <div className="text-sm">{topic}</div>
+                  <div className="font-medium">{topic}</div>
                 </button>
               ))}
+            </div>
+            
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Or enter your own topic..."
+                value={setupForm.topic}
+                onChange={(e) => setSetupForm({...setupForm, topic: e.target.value})}
+                className="w-full px-6 py-4 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+          </div>
+
+          {/* Model Selection */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
+              <span className="text-4xl">🤖</span>
+              Select AI Debaters
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Player 1 */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-blue-400 flex items-center gap-2">
+                  <span className="text-2xl">👤</span>
+                  Debater 1
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {models.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => setSetupForm({...setupForm, player1Model: model.id})}
+                      className={`p-4 rounded-xl text-center transition-all duration-300 transform hover:scale-105 ${
+                        setupForm.player1Model === model.id
+                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg'
+                          : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">{model.emoji}</div>
+                      <div className="font-medium">{model.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* VS */}
+              <div className="flex items-center justify-center">
+                <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
+                  VS
+                </div>
+              </div>
+
+              {/* Player 2 */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-red-400 flex items-center gap-2">
+                  <span className="text-2xl">👤</span>
+                  Debater 2
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {models.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => setSetupForm({...setupForm, player2Model: model.id})}
+                      className={`p-4 rounded-xl text-center transition-all duration-300 transform hover:scale-105 ${
+                        setupForm.player2Model === model.id
+                          ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-lg'
+                          : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">{model.emoji}</div>
+                      <div className="font-medium">{model.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Rounds Selection */}
           <div className="mb-8">
-            <label className="block text-sm font-medium mb-3 text-slate-300">
-              Total Rounds (each model speaks this many times)
-            </label>
-            <div className="flex gap-2">
-              {[4, 6, 8, 10].map((rounds) => (
-                <button
-                  key={rounds}
-                  onClick={() => handleInputChange('totalRounds', rounds)}
-                  className={`px-4 py-2 rounded-lg border transition-all duration-200 ${
-                    setupForm.totalRounds === rounds
-                      ? 'border-yellow-500 bg-yellow-900/50 text-yellow-200'
-                      : 'border-slate-600 bg-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  {rounds} rounds
-                </button>
-              ))}
-            </div>
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
+              <span className="text-2xl">🔄</span>
+              Number of Rounds
+            </h2>
+            <select
+              value={setupForm.totalRounds}
+              onChange={(e) => setSetupForm({...setupForm, totalRounds: parseInt(e.target.value)})}
+              className="px-6 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+            >
+              <option value={4}>4 Rounds (Quick)</option>
+              <option value={6}>6 Rounds (Standard)</option>
+              <option value={8}>8 Rounds (Extended)</option>
+              <option value={10}>10 Rounds (Full Debate)</option>
+            </select>
           </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-900/50 border border-red-500/50 rounded-xl">
+              <div className="text-red-400 font-medium">{error}</div>
+            </div>
+          )}
 
           {/* Start Button */}
-          <div className="text-center">
-            <button
-              onClick={handleStartDebate}
-              disabled={loading}
-              className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-105 ${
-                loading
-                  ? 'bg-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-purple-500/25'
-              }`}
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Starting Debate...
-                </div>
-              ) : (
-                '🎤 Start Voice Debate'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Features Info */}
-        <div className="max-w-4xl mx-auto mt-12 grid md:grid-cols-3 gap-6">
-          <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="text-3xl mb-3">🎤</div>
-            <h3 className="text-lg font-semibold mb-2">Voice-Powered</h3>
-            <p className="text-sm text-slate-400">
-              Arguments are spoken aloud using advanced text-to-speech technology
-            </p>
-          </div>
-          
-          <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-lg font-semibold mb-2">Real-Time</h3>
-            <p className="text-sm text-slate-400">
-              Watch the debate unfold live with instant responses and audio playback
-            </p>
-          </div>
-          
-          <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
-            <div className="text-3xl mb-3">🧠</div>
-            <h3 className="text-lg font-semibold mb-2">Intelligent</h3>
-            <p className="text-sm text-slate-400">
-              AI models engage in sophisticated arguments with automatic judging
-            </p>
-          </div>
+          <button
+            onClick={handleStartDebate}
+            disabled={loading || !setupForm.topic || !setupForm.player1Model || !setupForm.player2Model}
+            className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-bold text-xl rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center gap-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                Starting Debate...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">🎙️</span>
+                START VOICE DEBATE
+              </div>
+            )}
+          </button>
         </div>
       </div>
     </div>

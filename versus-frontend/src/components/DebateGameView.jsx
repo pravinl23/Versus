@@ -19,260 +19,430 @@ const DebateGameView = ({ debateId, onBackToMenu, setupForm }) => {
 
   // Audio refs for TTS playback
   const audioRef = useRef(null);
-  const transcriptEndRef = useRef(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState(null);
 
-  // Model info mapping
-  const getModelInfo = (modelType) => {
-    const models = {
-      'OPENAI': { name: 'GPT-4', icon: '🤖', color: 'blue' },
-      'ANTHROPIC': { name: 'Claude 3 Haiku', icon: '🧠', color: 'green' },
-      'GEMINI': { name: 'Gemini Pro', icon: '💎', color: 'purple' },
-      'GROQ': { name: 'Mixtral 8x7B', icon: '⚡', color: 'yellow' }
+  // Load initial debate state
+  useEffect(() => {
+    const loadDebateState = async () => {
+      try {
+        const response = await fetch(`http://localhost:8003/api/debate/${debateId}/state`);
+        if (response.ok) {
+          const state = await response.json();
+          setDebateState(state);
+          setTranscript(state.transcript || []);
+          setDebateFinished(state.is_finished);
+          if (state.judgment) {
+            setJudgment(state.judgment);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load debate state:', err);
+        setError('Failed to load debate state');
+      }
     };
-    return models[modelType] || { name: modelType, icon: '🤖', color: 'gray' };
-  };
+
+    loadDebateState();
+  }, [debateId]);
 
   // Handle WebSocket messages
   useEffect(() => {
     if (lastMessage) {
-      const message = JSON.parse(lastMessage.data);
-      
+      const message = lastMessage;
+      console.log('WebSocket message received:', message);
+
       switch (message.type) {
-        case 'current_state':
-          setDebateState(message.state);
-          setTranscript(message.transcript || []);
-          break;
-          
-        case 'round_completed':
-          setTranscript(prev => [...prev, message.round_data]);
-          setDebateState(message.debate_state);
-          
-          // Play audio if available
-          if (message.round_data.text && message.round_data.use_browser_tts) {
-            speakText(message.round_data.text);
+        case 'initial_state':
+        case 'state_update':
+          if (message.debate_state) {
+            setDebateState(message.debate_state);
+            setTranscript(message.debate_state.transcript || []);
+            setDebateFinished(message.debate_state.is_finished);
+            if (message.debate_state.judgment) {
+              setJudgment(message.debate_state.judgment);
+            }
           }
           break;
-          
-        case 'debate_finished':
-          setDebateFinished(true);
-          setJudgment(message.judgment);
-          setAutoAdvancing(false);
+        
+        case 'argument_generated':
+          if (message.debate_state) {
+            setDebateState(message.debate_state);
+            setTranscript(message.debate_state.transcript || []);
+            
+            // Auto-play the new argument if audio URL is available
+            if (message.audio_url) {
+              playAudioUrl(message.audio_url, message.player);
+            } else if (message.result?.argument) {
+              // Use browser TTS as fallback
+              speakText(message.result.argument, message.player);
+            }
+          }
+          break;
+        
+        case 'debate_judged':
+          if (message.judgment) {
+            setJudgment(message.judgment);
+            setDebateFinished(true);
+          }
           break;
       }
     }
   }, [lastMessage]);
 
-  // Browser-based text-to-speech
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Advance to next round
-  const handleNextRound = async () => {
+  // Generate argument for a player
+  const generateArgument = async (player, opponentTranscript = '') => {
     setLoading(true);
     try {
-      await fetch(`http://localhost:8003/api/debate/${debateId}/next-round`, {
-        method: 'POST'
+      const response = await fetch(`http://localhost:8003/api/debate/${debateId}/argument`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          player: player,
+          opponent_transcript: opponentTranscript
+        }),
       });
-    } catch (error) {
-      setError(`Failed to advance round: ${error.message}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate argument: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Argument generated:', data);
+      
+    } catch (err) {
+      console.error('Failed to generate argument:', err);
+      setError(`Failed to generate argument: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-advance through entire debate
-  const handleAutoAdvance = async () => {
+  // Auto-advance debate (generate arguments for both players)
+  const autoAdvanceDebate = async () => {
+    if (!debateState || debateFinished) return;
+    
     setAutoAdvancing(true);
     try {
-      await fetch(`http://localhost:8003/api/debate/${debateId}/auto-advance`, {
-        method: 'POST'
-      });
-    } catch (error) {
-      setError(`Auto-advance failed: ${error.message}`);
+      const currentPlayer = debateState.next_player;
+      const otherPlayer = currentPlayer === 'player1' ? 'player2' : 'player1';
+      
+      // Generate argument for current player
+      await generateArgument(currentPlayer);
+      
+      // Wait a bit then check if we can continue
+      setTimeout(async () => {
+        if (!debateState.is_finished) {
+          await generateArgument(otherPlayer);
+        }
+      }, 3000);
+      
+    } catch (err) {
+      console.error('Auto advance failed:', err);
+      setError('Auto advance failed');
+    } finally {
       setAutoAdvancing(false);
     }
   };
 
-  if (!isConnected) {
+  // Judge the debate
+  const judgeDebate = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8003/api/debate/${debateId}/judge`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to judge debate: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setJudgment(data.judgment);
+      setDebateFinished(true);
+      
+    } catch (err) {
+      console.error('Failed to judge debate:', err);
+      setError(`Failed to judge debate: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Play audio from URL (Vapi)
+  const playAudioUrl = (audioUrl, player) => {
+    if (audioRef.current) {
+      audioRef.current.src = audioUrl;
+      audioRef.current.play().catch(err => {
+        console.log('Audio playback failed, using TTS fallback');
+      });
+      setCurrentlyPlaying(player);
+    }
+  };
+
+  // Browser TTS fallback
+  const speakText = (text, player) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Set voice based on player
+      const voices = speechSynthesis.getVoices();
+      if (player === 'player1') {
+        // Use male voice for player 1
+        const maleVoice = voices.find(v => v.name.includes('Male') || v.name.includes('male')) || voices[0];
+        utterance.voice = maleVoice;
+      } else {
+        // Use female voice for player 2
+        const femaleVoice = voices.find(v => v.name.includes('Female') || v.name.includes('female')) || voices[1];
+        utterance.voice = femaleVoice;
+      }
+      
+      utterance.rate = 0.9;
+      utterance.pitch = player === 'player1' ? 0.8 : 1.2;
+      
+      utterance.onstart = () => setCurrentlyPlaying(player);
+      utterance.onend = () => setCurrentlyPlaying(null);
+      
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Replay audio for a specific transcript entry
+  const replayArgument = (entry) => {
+    if (entry.audio_url) {
+      playAudioUrl(entry.audio_url, entry.player);
+    } else {
+      speakText(entry.argument, entry.player);
+    }
+  };
+
+  if (!debateState) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-xl">Connecting to debate arena...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-purple-500 border-t-transparent mx-auto mb-6"></div>
+            <div className="absolute inset-0 rounded-full h-20 w-20 border-4 border-pink-500/30 animate-ping mx-auto"></div>
+          </div>
+          <div className="text-3xl font-black text-white mb-2">Loading Debate</div>
+          <div className="text-slate-400 text-lg">Setting up the arena...</div>
         </div>
       </div>
     );
   }
 
+  const getPlayerInfo = (player) => {
+    const isPlayer1 = player === 'player1';
+    const model = isPlayer1 ? setupForm.player1Model : setupForm.player2Model;
+    const position = debateState.positions?.[player] || 'UNKNOWN';
+    const color = isPlayer1 ? 'blue' : 'red';
+    
+    return { model, position, color, isPlayer1 };
+  };
+
+  const getWinnerDisplay = () => {
+    if (!judgment) return null;
+    
+    const winner = judgment.winner;
+    if (winner === 'TIE') {
+      return (
+        <div className="text-center p-6 bg-gradient-to-r from-yellow-900/50 to-orange-900/50 rounded-2xl border border-yellow-600/30">
+          <div className="text-6xl mb-4">🤝</div>
+          <div className="text-3xl font-bold text-yellow-400 mb-2">It's a Tie!</div>
+          <div className="text-slate-300">{judgment.reasoning}</div>
+        </div>
+      );
+    }
+    
+    // Find which player won
+    let winnerPlayer = null;
+    for (const [player, position] of Object.entries(debateState.positions)) {
+      if (position === winner) {
+        winnerPlayer = player;
+        break;
+      }
+    }
+    
+    if (winnerPlayer) {
+      const playerInfo = getPlayerInfo(winnerPlayer);
+      return (
+        <div className={`text-center p-6 bg-gradient-to-r from-${playerInfo.color}-900/50 to-${playerInfo.color}-800/50 rounded-2xl border border-${playerInfo.color}-600/30`}>
+          <div className="text-6xl mb-4">🏆</div>
+          <div className={`text-3xl font-bold text-${playerInfo.color}-400 mb-2`}>
+            {playerInfo.model} Wins!
+          </div>
+          <div className="text-lg text-slate-300 mb-2">
+            Position: {playerInfo.position}
+          </div>
+          <div className="text-slate-300">{judgment.reasoning}</div>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <button
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900">
+      {/* Hidden audio element for Vapi playback */}
+      <audio ref={audioRef} onEnded={() => setCurrentlyPlaying(null)} />
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl">
+        <div className="max-w-7xl mx-auto p-6">
+          <button 
             onClick={onBackToMenu}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+            className="mb-6 px-6 py-3 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium flex items-center gap-2"
           >
-            ← Back to Setup
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Setup
           </button>
           
-          <h1 className="text-2xl font-bold">🎭 Voice Debate Arena</h1>
-          
-          <div className={`px-3 py-1 rounded-full text-sm ${
-            isConnected ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
-          }`}>
-            {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+          <div className="text-center">
+            <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 mb-3">
+              🎭 LIVE DEBATE
+            </h1>
+            <p className="text-2xl text-slate-300 mb-4 font-medium">
+              {debateState.topic}
+            </p>
+            <div className="flex items-center justify-center gap-4 text-lg text-slate-400">
+              <span>Round {debateState.current_round + 1} of {debateState.total_rounds}</span>
+              <span>•</span>
+              <span className={isConnected ? 'text-green-400' : 'text-red-400'}>
+                {isConnected ? '🔗 Connected' : '❌ Disconnected'}
+              </span>
+            </div>
           </div>
         </div>
+      </div>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200">
-            {error}
-          </div>
-        )}
-
-        {/* Debate Controls */}
-        {!debateFinished && debateState && (
-          <div className="mb-6 bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-slate-300">
-                Round {debateState.current_round + 1} of {debateState.total_rounds}
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={handleNextRound}
-                  disabled={loading || autoAdvancing}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    loading || autoAdvancing
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-purple-600 hover:bg-purple-700'
-                  }`}
-                >
-                  {loading ? 'Advancing...' : 'Next Round'}
-                </button>
-                
-                <button
-                  onClick={handleAutoAdvance}
-                  disabled={loading || autoAdvancing}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    autoAdvancing
-                      ? 'bg-yellow-600 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {autoAdvancing ? '⏳ Auto-Running...' : '⚡ Auto-Advance'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Players Info */}
-        {debateState && (
-          <div className="grid md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-blue-900/30 rounded-xl p-4 border border-blue-700">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">{getModelInfo(setupForm.player1Model).icon}</div>
-                <div>
-                  <div className="font-semibold">{getModelInfo(setupForm.player1Model).name}</div>
-                  <div className="text-sm text-blue-200">
-                    Position: {debateState.player1_position}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-green-900/30 rounded-xl p-4 border border-green-700">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">{getModelInfo(setupForm.player2Model).icon}</div>
-                <div>
-                  <div className="font-semibold">{getModelInfo(setupForm.player2Model).name}</div>
-                  <div className="text-sm text-green-200">
-                    Position: {debateState.player2_position}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Transcript */}
-        <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-semibold mb-4">📝 Debate Transcript</h2>
-          
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {transcript.length === 0 ? (
-              <div className="text-center text-slate-400 py-8">
-                Debate transcript will appear here...
-              </div>
-            ) : (
-              transcript.map((entry, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    entry.speaker === 1
-                      ? 'bg-blue-900/20 border-blue-500'
-                      : 'bg-green-900/20 border-green-500'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">
-                      {entry.speaker === 1 ? getModelInfo(setupForm.player1Model).name : getModelInfo(setupForm.player2Model).name}
-                    </span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      entry.position === 'PRO' ? 'bg-green-700 text-green-200' : 'bg-red-700 text-red-200'
-                    }`}>
-                      {entry.position}
-                    </span>
-                  </div>
-                  
-                  <p className="text-slate-200">{entry.text}</p>
-                  
-                  <button
-                    onClick={() => speakText(entry.text)}
-                    className="mt-2 text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
-                  >
-                    🔊 Play Audio
-                  </button>
-                </div>
-              ))
-            )}
-            <div ref={transcriptEndRef} />
-          </div>
-        </div>
-
-        {/* Final Judgment */}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Winner Display */}
         {debateFinished && judgment && (
-          <div className="mt-6 bg-gradient-to-r from-yellow-900/50 to-orange-900/50 rounded-xl p-6 border border-yellow-700">
-            <h2 className="text-2xl font-semibold mb-4">🏆 Final Judgment</h2>
-            
-            {judgment.winner ? (
-              <div className="text-center mb-4">
-                <div className="text-xl font-bold mb-2">
-                  Winner: {judgment.winner === 1 ? getModelInfo(setupForm.player1Model).name : getModelInfo(setupForm.player2Model).name}
-                </div>
-                <div className="text-lg text-yellow-200">
-                  Position: {judgment.winner_position}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center mb-4">
-                <div className="text-xl font-bold">Draw / Inconclusive</div>
-              </div>
-            )}
-            
-            <div className="bg-slate-800/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Judge's Reasoning:</h3>
-              <p className="text-slate-200">{judgment.reasoning}</p>
-            </div>
+          <div className="mb-8">
+            {getWinnerDisplay()}
           </div>
         )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/50 border border-red-500/50 rounded-xl">
+            <div className="text-red-400 font-medium">{error}</div>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="mb-8 flex justify-center gap-4">
+          {!debateFinished && (
+            <>
+              <button
+                onClick={() => generateArgument(debateState.next_player)}
+                disabled={loading || autoAdvancing}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg"
+              >
+                {loading ? '⏳ Generating...' : `🎤 Next Argument (${debateState.next_player})`}
+              </button>
+              
+              <button
+                onClick={autoAdvanceDebate}
+                disabled={loading || autoAdvancing}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg"
+              >
+                {autoAdvancing ? '⏳ Auto Running...' : '🚀 Auto Advance'}
+              </button>
+            </>
+          )}
+          
+          {debateFinished && !judgment && (
+            <button
+              onClick={judgeDebate}
+              disabled={loading}
+              className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg"
+            >
+              {loading ? '⏳ Judging...' : '⚖️ Judge Debate'}
+            </button>
+          )}
+        </div>
+
+        {/* Debate Transcript */}
+        <div className="bg-gradient-to-br from-slate-800/50 to-slate-700/50 backdrop-blur-xl rounded-3xl border border-slate-600/30 shadow-2xl p-8">
+          <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
+            <span className="text-4xl">📜</span>
+            Debate Transcript
+          </h2>
+          
+          {transcript.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎭</div>
+              <div className="text-2xl text-slate-400 mb-2">No arguments yet</div>
+              <div className="text-slate-500">Click "Next Argument" to begin the debate</div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {transcript.map((entry, index) => {
+                const playerInfo = getPlayerInfo(entry.player);
+                const isCurrentlyPlayingThis = currentlyPlaying === entry.player;
+                
+                return (
+                  <div
+                    key={index}
+                    className={`p-6 rounded-2xl border transition-all duration-300 ${
+                      playerInfo.isPlayer1
+                        ? 'bg-gradient-to-r from-blue-900/30 to-blue-800/30 border-blue-600/30'
+                        : 'bg-gradient-to-r from-red-900/30 to-red-800/30 border-red-600/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${
+                          playerInfo.isPlayer1
+                            ? 'from-blue-600 to-cyan-600'
+                            : 'from-red-600 to-pink-600'
+                        } flex items-center justify-center text-white font-bold text-lg`}>
+                          {playerInfo.isPlayer1 ? '1' : '2'}
+                        </div>
+                        <div>
+                          <div className={`text-xl font-bold ${
+                            playerInfo.isPlayer1 ? 'text-blue-400' : 'text-red-400'
+                          }`}>
+                            {playerInfo.model}
+                          </div>
+                          <div className="text-slate-400 text-sm">
+                            Position: {playerInfo.position} • Round {entry.round} • {entry.round_type}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => replayArgument(entry)}
+                        disabled={isCurrentlyPlayingThis}
+                        className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 disabled:bg-green-600/50 text-white rounded-lg transition-all duration-300 flex items-center gap-2"
+                      >
+                        {isCurrentlyPlayingThis ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Playing
+                          </>
+                        ) : (
+                          <>
+                            🔊 Replay
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    <div className="text-white text-lg leading-relaxed">
+                      {entry.argument}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
