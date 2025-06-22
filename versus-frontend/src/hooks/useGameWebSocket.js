@@ -1,16 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createGameWebSocket } from '../utils/gameUtils';
 
-const useGameWebSocket = (gameType, gameId) => {
+const useGameWebSocket = (gameTypeOrUrl, gameId = null) => {
   const [socket, setSocket] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
 
   useEffect(() => {
-    if (!gameType || !gameId) return;
-
-    const ws = createGameWebSocket(gameType, gameId);
+    // Support both URL format and gameType/gameId format
+    let ws;
+    
+    if (gameTypeOrUrl && gameTypeOrUrl.startsWith('ws://') || gameTypeOrUrl && gameTypeOrUrl.startsWith('wss://')) {
+      // Direct WebSocket URL
+      ws = new WebSocket(gameTypeOrUrl);
+    } else if (gameTypeOrUrl && gameId) {
+      // Legacy format: gameType and gameId
+      ws = createGameWebSocket(gameTypeOrUrl, gameId);
+    } else {
+      return;
+    }
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -44,7 +53,7 @@ const useGameWebSocket = (gameType, gameId) => {
     return () => {
       ws.close();
     };
-  }, [gameType, gameId]);
+  }, [gameTypeOrUrl, gameId]);
 
   const sendMessage = useCallback((message) => {
     if (socket && socket.readyState === WebSocket.OPEN) {

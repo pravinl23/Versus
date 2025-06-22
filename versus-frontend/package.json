@@ -18,11 +18,14 @@
     "@react-three/fiber": "^9.1.2",
     "@react-three/postprocessing": "^3.0.4",
     "@tailwindcss/postcss": "^4.1.10",
+    "@vapi-ai/web": "^2.3.6",
     "lucide-react": "^0.522.0",
     "postprocessing": "^6.37.4",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2",
+    "recharts": "^2.15.4",
     "three": "^0.177.0"
   },
   "devDependencies": {

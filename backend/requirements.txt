@@ -4,12 +4,14 @@ uvicorn[standard]>=0.24.0
 python-dotenv==1.0.0
 websockets==12.0
 
-# Additional dependencies from main
+# Python 3.12 compatibility
 setuptools>=65.5.1
+
+# Additional web framework dependencies
 flask==3.0.0
 flask-cors==4.0.0
 
-# LLM API clients (using newer versions from main)
+# LLM API clients (using latest versions)
 openai==1.51.0
 anthropic==0.34.0
 google-generativeai==0.3.0
@@ -23,5 +25,8 @@ pydantic>=2.8.0
 httpx==0.25.0
 python-multipart==0.0.6
 
-# Game-specific (optional)
+# Game-specific and general utilities
 numpy==1.26.4
+
+# Voice synthesis (optional)
+# elevenlabs==0.2.26  # Optional: for direct ElevenLabs integration

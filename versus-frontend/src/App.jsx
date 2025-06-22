@@ -7,10 +7,10 @@ import Battleship from "./components/games/Battleship/Battleship"
 import TriviaGame from "./components/TriviaGame"
 import WordleGame from "./components/games/WordleGame"
 import ConnectionsGame from "./components/games/ConnectionsGame"
+import SimpleDebateGame from "./components/SimpleDebateGame"
 import NewLandingPage from "./pages/LandingPage"
 import ModelSelection from "./pages/ModelSelection"
 import VotePage from "./pages/VotePage"
-
 
 const GAMES = [
   { name: "Wordle", emoji: "📝", description: "Word guessing" },
@@ -18,6 +18,7 @@ const GAMES = [
   { name: "NYT Connections", emoji: "🔗", description: "Find the connections" },
   { name: "Battleship", emoji: "🚢", description: "Naval strategy" },
   { name: "Connect 4", emoji: "🔴", description: "Four in a row" },
+  { name: "Debate", emoji: "🎭", description: "AI argument showdown" }
 ]
 
 function MainMenu() {
@@ -40,6 +41,13 @@ function MainMenu() {
           player1Model,
           player2Model,
         },
+      })
+    } else if (game.name === "Debate") {
+      navigate('/debate', { 
+        state: { 
+          player1Model, 
+          player2Model 
+        } 
       })
     } else if (game.name === "Wordle") {
       console.log("Starting match:", {
@@ -213,6 +221,7 @@ function App() {
         <Route path="/model-selection" element={<ModelSelection />} />
         <Route path="/games" element={<MainMenu />} />
         <Route path="/trivia" element={<TriviaGame />} />
+        <Route path="/debate" element={<SimpleDebateGame />} />
         <Route path="/vote" element={<VotePage />} />
       </Routes>
     </Router>
