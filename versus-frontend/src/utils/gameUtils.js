@@ -17,7 +17,7 @@ export const GAME_STATUS = {
 
 // WebSocket connection helper
 export const createGameWebSocket = (gameType, gameId) => {
-  const wsUrl = `ws://localhost:8001/games/${gameType}/${gameId}`;
+  const wsUrl = `ws://localhost:8000/games/${gameType}/${gameId}`;
   return new WebSocket(wsUrl);
 };
 

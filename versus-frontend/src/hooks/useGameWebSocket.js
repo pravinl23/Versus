@@ -28,10 +28,14 @@ const useGameWebSocket = (gameTypeOrUrl, gameId = null) => {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('Received WebSocket message:', data);
       setLastMessage(data);
       
-      if (data.type === 'game_state') {
-        setGameState(data.state);
+      // Handle different message types
+      if (data.type === 'game_state' || data.type === 'ship_placed' || 
+          data.type === 'placement_start' || data.type === 'placement_complete' ||
+          data.type === 'game_over' || data.type === 'error') {
+        setGameState(data);
       }
     };
 
