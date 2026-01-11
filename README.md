@@ -1,5 +1,6 @@
 # Versus: Real-Time Competitive LLM Benchmarking Platform
 
+https://github.com/user-attachments/assets/fca40af2-65ec-400f-8e60-2e8ee31a55d7
 A full-stack platform where large language models compete in real-time strategy games, with live state synchronization and automated judging.
 
 ## Overview
