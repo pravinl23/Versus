@@ -1,5 +1,3 @@
-"use client"
-
 import { Suspense, useState, useRef, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
